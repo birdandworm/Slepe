@@ -1,6 +1,6 @@
 import random
+import matplotlib.pyplot as plt
 
-# Sample OSRS item names; expand as desired
 OSRS_ITEMS = [
     "Bronze sword", "Iron pickaxe", "Cowhide", "Rune scimitar", "Dragon scimitar",
     "Partyhat", "Abyssal whip", "Saradomin brew", "Zulrah's scales", "Barrows gloves",
@@ -12,53 +12,65 @@ class Tile:
     def __init__(self, index, item_name, effect=None, target=None):
         self.index = index
         self.item_name = item_name
-        self.effect = effect        # None, "skip_ahead", or "fall_back"
-        self.target = target        # Target tile index if effect is triggered
+        self.effect = effect
+        self.target = target
 
     def __repr__(self):
         if self.effect:
             return f"{self.index}: {self.item_name} ({self.effect} to {self.target})"
         return f"{self.index}: {self.item_name}"
 
-def generate_board(
-    num_tiles=30,
-    num_skip_ahead=3,
-    num_fall_back=3,
-    seed=None
-):
+def generate_board(num_tiles=30, num_skip_ahead=3, num_fall_back=3, seed=None):
     if seed is not None:
         random.seed(seed)
-
-    # Ensure enough unique items for the tiles
     items = random.choices(OSRS_ITEMS, k=num_tiles)
-
     tiles = [Tile(idx, item) for idx, item in enumerate(items)]
-
-    # Choose skip ahead and fall back positions
     available_indices = set(range(1, num_tiles-1))
     skip_ahead_indices = random.sample(list(available_indices), num_skip_ahead)
     available_indices -= set(skip_ahead_indices)
     fall_back_indices = random.sample(list(available_indices), num_fall_back)
-
-    # Assign skip ahead (ladder) tiles
     for idx in skip_ahead_indices:
-        # Jump ahead by 3-8 tiles, but not past the end
         jump = random.randint(3, 8)
         target = min(idx + jump, num_tiles - 1)
         tiles[idx].effect = "skip_ahead"
         tiles[idx].target = target
-
-    # Assign fall back (snake) tiles
     for idx in fall_back_indices:
-        # Fall back by 3-8 tiles, but not before start
         drop = random.randint(3, 8)
         target = max(idx - drop, 0)
         tiles[idx].effect = "fall_back"
         tiles[idx].target = target
-
     return tiles
 
+def visualize_board(tiles):
+    n = len(tiles)
+    fig, ax = plt.subplots(figsize=(n // 3, 4))
+    y = [1] * n
+    colors = []
+    for tile in tiles:
+        if tile.effect == "skip_ahead":
+            colors.append('limegreen')
+        elif tile.effect == "fall_back":
+            colors.append('red')
+        else:
+            colors.append('gold')
+    ax.scatter(range(n), y, c=colors, s=600, edgecolor='black', zorder=2)
+    for i, tile in enumerate(tiles):
+        ax.text(i, 1.04, str(i), ha='center', va='bottom', fontsize=8, fontweight='bold', zorder=3)
+        ax.text(i, 0.95, tile.item_name, ha='center', va='top', fontsize=7, rotation=90, zorder=3)
+    # Draw arrows for effect tiles
+    for tile in tiles:
+        if tile.effect in ("skip_ahead", "fall_back"):
+            ax.annotate("",
+                        xy=(tile.target, 1), xycoords='data',
+                        xytext=(tile.index, 1), textcoords='data',
+                        arrowprops=dict(arrowstyle="->", lw=2, color=('green' if tile.effect == "skip_ahead" else 'red')),
+                        zorder=4)
+    ax.axis('off')
+    ax.set_xlim(-1, n)
+    ax.set_ylim(0.8, 1.2)
+    plt.tight_layout()
+    plt.show()
+
 if __name__ == "__main__":
-    board = generate_board(num_tiles=30, num_skip_ahead=4, num_fall_back=4, seed=42)
-    for tile in board:
-        print(tile)
+    board = generate_board(num_tiles=20, num_skip_ahead=3, num_fall_back=3, seed=42)
+    visualize_board(board)
