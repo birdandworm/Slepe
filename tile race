@@ -1,76 +1,186 @@
-import random
-import matplotlib.pyplot as plt
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OSRS Tile Race Board</title>
+  <style>
+    body {
+      background: #232323;
+      color: #ddd;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .board {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-end;
+      margin-bottom: 40px;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .tile {
+      position: relative;
+      width: 70px;
+      height: 110px;
+      background: gold;
+      border-radius: 8px;
+      border: 2px solid #444;
+      margin: 2px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      transition: transform 0.2s;
+      box-shadow: 1px 2px 6px #0008;
+    }
+    .tile.skip-ahead { background: #44e044; }
+    .tile.fall-back { background: #e05050; }
+    .tile .index {
+      font-size: 1.1em;
+      font-weight: bold;
+      margin-bottom: 2px;
+      color: #222;
+      background: #ffe;
+      border-radius: 4px;
+      padding: 2px 8px;
+      position: absolute;
+      top: 4px;
+      left: 4px;
+    }
+    .tile .item {
+      font-size: 0.92em;
+      margin-bottom: 10px;
+      text-align: center;
+      color: #fff;
+      padding: 2px 4px;
+      word-break: break-word;
+    }
+    .arrow {
+      position: absolute;
+      left: 100%;
+      top: 50%;
+      width: 40px;
+      height: 0;
+      border-top: 2px solid #0f0;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .arrow.fall-back {
+      border-top: 2px solid #f00;
+      left: -40px;
+      right: 100%;
+      transform: scaleX(-1);
+    }
+    .arrow-head {
+      position: absolute;
+      width: 0; height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 12px solid #0f0;
+      left: 38px;
+      top: -9px;
+    }
+    .arrow.fall-back .arrow-head {
+      border-left: 12px solid #f00;
+      left: -12px;
+      transform: scaleX(-1);
+    }
+  </style>
+</head>
+<body>
+  <h1>OSRS Tile Race Board</h1>
+  <div id="board" class="board"></div>
+  <script>
+    // --- Board generation logic ---
+    const OSRS_ITEMS = [
+      "Bronze sword", "Iron pickaxe", "Cowhide", "Rune scimitar", "Dragon scimitar",
+      "Partyhat", "Abyssal whip", "Saradomin brew", "Zulrah's scales", "Barrows gloves",
+      "Rune platebody", "Mithril platebody", "Dragon pickaxe", "Bandos tassets",
+      "Armadyl godsword", "Sanfew serum", "Ring of wealth", "Fire cape", "Dragon bones", "Magic logs"
+    ];
 
-OSRS_ITEMS = [
-    "Bronze sword", "Iron pickaxe", "Cowhide", "Rune scimitar", "Dragon scimitar",
-    "Partyhat", "Abyssal whip", "Saradomin brew", "Zulrah's scales", "Barrows gloves",
-    "Rune platebody", "Mithril platebody", "Dragon pickaxe", "Bandos tassets",
-    "Armadyl godsword", "Sanfew serum", "Ring of wealth", "Fire cape", "Dragon bones", "Magic logs"
-]
+    function randomInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 
-class Tile:
-    def __init__(self, index, item_name, effect=None, target=None):
-        self.index = index
-        self.item_name = item_name
-        self.effect = effect
-        self.target = target
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i+1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
 
-    def __repr__(self):
-        if self.effect:
-            return f"{self.index}: {self.item_name} ({self.effect} to {self.target})"
-        return f"{self.index}: {self.item_name}"
+    function generateBoard(numTiles = 20, numSkipAhead = 3, numFallBack = 3) {
+      // Pick items
+      let items = [];
+      for (let i = 0; i < numTiles; ++i)
+        items.push(OSRS_ITEMS[randomInt(0, OSRS_ITEMS.length-1)]);
+      // Pick indices for effects
+      let available = [];
+      for (let i = 1; i < numTiles-1; ++i) available.push(i);
+      shuffle(available);
+      let skipAheadIndices = available.slice(0, numSkipAhead);
+      let fallBackIndices = available.slice(numSkipAhead, numSkipAhead + numFallBack);
 
-def generate_board(num_tiles=30, num_skip_ahead=3, num_fall_back=3, seed=None):
-    if seed is not None:
-        random.seed(seed)
-    items = random.choices(OSRS_ITEMS, k=num_tiles)
-    tiles = [Tile(idx, item) for idx, item in enumerate(items)]
-    available_indices = set(range(1, num_tiles-1))
-    skip_ahead_indices = random.sample(list(available_indices), num_skip_ahead)
-    available_indices -= set(skip_ahead_indices)
-    fall_back_indices = random.sample(list(available_indices), num_fall_back)
-    for idx in skip_ahead_indices:
-        jump = random.randint(3, 8)
-        target = min(idx + jump, num_tiles - 1)
-        tiles[idx].effect = "skip_ahead"
-        tiles[idx].target = target
-    for idx in fall_back_indices:
-        drop = random.randint(3, 8)
-        target = max(idx - drop, 0)
-        tiles[idx].effect = "fall_back"
-        tiles[idx].target = target
-    return tiles
+      // Build tiles
+      let tiles = [];
+      for (let i = 0; i < numTiles; ++i)
+        tiles.push({ index: i, item: items[i], effect: null, target: null });
 
-def visualize_board(tiles):
-    n = len(tiles)
-    fig, ax = plt.subplots(figsize=(n // 3, 4))
-    y = [1] * n
-    colors = []
-    for tile in tiles:
-        if tile.effect == "skip_ahead":
-            colors.append('limegreen')
-        elif tile.effect == "fall_back":
-            colors.append('red')
-        else:
-            colors.append('gold')
-    ax.scatter(range(n), y, c=colors, s=600, edgecolor='black', zorder=2)
-    for i, tile in enumerate(tiles):
-        ax.text(i, 1.04, str(i), ha='center', va='bottom', fontsize=8, fontweight='bold', zorder=3)
-        ax.text(i, 0.95, tile.item_name, ha='center', va='top', fontsize=7, rotation=90, zorder=3)
-    # Draw arrows for effect tiles
-    for tile in tiles:
-        if tile.effect in ("skip_ahead", "fall_back"):
-            ax.annotate("",
-                        xy=(tile.target, 1), xycoords='data',
-                        xytext=(tile.index, 1), textcoords='data',
-                        arrowprops=dict(arrowstyle="->", lw=2, color=('green' if tile.effect == "skip_ahead" else 'red')),
-                        zorder=4)
-    ax.axis('off')
-    ax.set_xlim(-1, n)
-    ax.set_ylim(0.8, 1.2)
-    plt.tight_layout()
-    plt.show()
+      // Assign skip-ahead
+      for (let idx of skipAheadIndices) {
+        let jump = randomInt(3, 7);
+        let target = Math.min(idx + jump, numTiles-1);
+        if (target !== idx)
+          tiles[idx].effect = { type: "skip-ahead", target: target };
+      }
+      // Assign fall-back
+      for (let idx of fallBackIndices) {
+        let drop = randomInt(3, 7);
+        let target = Math.max(idx - drop, 0);
+        if (target !== idx)
+          tiles[idx].effect = { type: "fall-back", target: target };
+      }
+      return tiles;
+    }
 
-if __name__ == "__main__":
-    board = generate_board(num_tiles=20, num_skip_ahead=3, num_fall_back=3, seed=42)
-    visualize_board(board)
+    // --- Visualization ---
+    function renderBoard(tiles) {
+      const container = document.getElementById('board');
+      container.innerHTML = '';
+
+      tiles.forEach((tile, i) => {
+        const div = document.createElement('div');
+        div.className = 'tile';
+        if (tile.effect) {
+          if (tile.effect.type === 'skip-ahead') div.classList.add('skip-ahead');
+          if (tile.effect.type === 'fall-back') div.classList.add('fall-back');
+        }
+        const idxSpan = document.createElement('span');
+        idxSpan.className = 'index';
+        idxSpan.textContent = tile.index;
+        div.appendChild(idxSpan);
+        const itemSpan = document.createElement('span');
+        itemSpan.className = 'item';
+        itemSpan.textContent = tile.item;
+        div.appendChild(itemSpan);
+
+        // Add arrows if needed
+        if (tile.effect) {
+          const arrow = document.createElement('div');
+          arrow.className = 'arrow'+(tile.effect.type === "fall-back" ? " fall-back" : "");
+          arrow.style.width = (Math.abs(tile.index - tile.effect.target) * 70 - 10) + "px";
+          const arrowHead = document.createElement('div');
+          arrowHead.className = 'arrow-head';
+          arrow.appendChild(arrowHead);
+          div.appendChild(arrow);
+        }
+        container.appendChild(div);
+      });
+    }
+
+    // --- Run ---
+    const tiles = generateBoard(20, 3, 3);
+    renderBoard(tiles);
+  </script>
+</body>
+</html>
