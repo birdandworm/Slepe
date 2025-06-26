@@ -1,505 +1,64 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snakes & Ladders Style Game</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome for dice icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body {
-            font-family: "Inter", sans-serif;
-            background-color: #f0f2f5;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        .game-container {
-            background-color: #ffffff;
-            border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            max-width: 900px;
-            width: 100%;
-        }
-        .board-grid {
-            display: grid;
-            grid-template-columns: repeat(10, 1fr); /* 10 columns */
-            grid-template-rows: repeat(5, 1fr); /* 5 rows for a total of 50 tiles */
-            width: 700px; /* Adjusted width for 10 columns */
-            height: 350px; /* Adjusted height for 5 rows */
-            border: 2px solid #3b82f6;
-            border-radius: 10px;
-            overflow: hidden;
-            position: relative; /* For player positioning */
-        }
-        .cell {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            font-size: 1.1rem;
-            color: #333;
-            border: 1px solid #e2e8f0;
-            box-sizing: border-box; /* Include padding/border in element's total width/height */
-        }
-        .player {
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-weight: bold;
-            color: white;
-            transition: all 0.5s ease-in-out;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-            z-index: 10; /* Ensure players are above cells */
-            /* Initial position will be set by JS */
-        }
-        .player-1 { background-color: #ef4444; } /* Red */
-        .player-2 { background-color: #22c55e; } /* Green */
+import random
 
-        .dice-container {
-            width: 100px;
-            height: 100px;
-            background-color: #cbd5e1; /* Gray-300 */
-            border-radius: 15px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 3rem;
-            color: #1f2937; /* Gray-800 */
-            margin-top: 20px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            transition: transform 0.1s ease-out;
-        }
-        .dice-container.rolling {
-            transform: scale(1.1) rotate(10deg);
-        }
-        .roll-button {
-            padding: 12px 28px;
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
-            color: white;
-            font-weight: bold;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            font-size: 1.1rem;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            transition: all 0.2s ease-in-out;
-            margin-top: 20px;
-        }
-        .roll-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
-        }
-        .roll-button:active {
-            transform: translateY(0);
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-        }
-        .reset-button {
-            padding: 10px 20px;
-            background-color: #6b7280; /* Gray-500 */
-            color: white;
-            font-weight: bold;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            font-size: 1rem;
-            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease-in-out;
-            margin-top: 10px;
-        }
-        .reset-button:hover {
-            background-color: #4b5563; /* Gray-700 */
-            transform: translateY(-1px);
-        }
-        .message-box {
-            background-color: #e0f2fe; /* Light blue */
-            border: 1px solid #90cdf4;
-            color: #2b6cb0;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            width: 100%;
-            text-align: center;
-            font-weight: 600;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
+# Sample OSRS item names; expand as desired
+OSRS_ITEMS = [
+    "Bronze sword", "Iron pickaxe", "Cowhide", "Rune scimitar", "Dragon scimitar",
+    "Partyhat", "Abyssal whip", "Saradomin brew", "Zulrah's scales", "Barrows gloves",
+    "Rune platebody", "Mithril platebody", "Dragon pickaxe", "Bandos tassets",
+    "Armadyl godsword", "Sanfew serum", "Ring of wealth", "Fire cape", "Dragon bones", "Magic logs"
+]
 
-        /* Responsive adjustments for board size */
-        @media (max-width: 768px) {
-            .board-grid {
-                width: 320px;
-                height: 160px; /* Adjust height for 5 rows on mobile */
-            }
-            .player {
-                width: 20px;
-                height: 20px;
-                font-size: 0.7rem;
-            }
-            .dice-container {
-                width: 80px;
-                height: 80px;
-                font-size: 2.5rem;
-            }
-            .roll-button {
-                padding: 10px 20px;
-                font-size: 1rem;
-            }
-            .game-container {
-                padding: 20px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="game-container">
-        <h1 class="text-3xl font-extrabold text-gray-800 mb-6">Dice Board Game</h1>
+class Tile:
+    def __init__(self, index, item_name, effect=None, target=None):
+        self.index = index
+        self.item_name = item_name
+        self.effect = effect        # None, "skip_ahead", or "fall_back"
+        self.target = target        # Target tile index if effect is triggered
 
-        <div id="messageBox" class="message-box mb-4 hidden"></div>
+    def __repr__(self):
+        if self.effect:
+            return f"{self.index}: {self.item_name} ({self.effect} to {self.target})"
+        return f"{self.index}: {self.item_name}"
 
-        <div id="board" class="board-grid">
-            <!-- Cells will be generated by JavaScript -->
-        </div>
+def generate_board(
+    num_tiles=30,
+    num_skip_ahead=3,
+    num_fall_back=3,
+    seed=None
+):
+    if seed is not None:
+        random.seed(seed)
 
-        <div class="flex flex-col items-center mt-6">
-            <div class="flex items-center space-x-4 mb-4">
-                <div class="flex items-center">
-                    <span class="w-6 h-6 rounded-full player-1 mr-2"></span>
-                    <span class="text-lg font-semibold text-gray-700">Player 1</span>
-                </div>
-                <div class="flex items-center">
-                    <span class="w-6 h-6 rounded-full player-2 mr-2"></span>
-                    <span class="text-lg font-semibold text-gray-700">Player 2</span>
-                </div>
-            </div>
+    # Ensure enough unique items for the tiles
+    items = random.choices(OSRS_ITEMS, k=num_tiles)
 
-            <div id="dice" class="dice-container">
-                <i class="fas fa-dice-one"></i> <!-- Default dice icon -->
-            </div>
-            <button id="rollDiceBtn" class="roll-button">Roll Dice</button>
-            <button id="resetGameBtn" class="reset-button hidden">Reset Game</button>
-        </div>
-    </div>
+    tiles = [Tile(idx, item) for idx, item in enumerate(items)]
 
-    <script>
-        // Game Constants
-        const BOARD_COLS = 10; // Number of columns
-        const BOARD_ROWS = 5;  // Number of rows
-        const TOTAL_CELLS = BOARD_COLS * BOARD_ROWS; // Total cells = 50
-        const PLAYER_OFFSET = 15; // Offset for player token centering
-        const DICE_ICONS = [
-            'fas fa-dice-one',
-            'fas fa-dice-two',
-            'fas fa-dice-three',
-            'fas fa-dice-four',
-            'fas fa-dice-five',
-            'fas fa-dice-six'
-        ];
+    # Choose skip ahead and fall back positions
+    available_indices = set(range(1, num_tiles-1))
+    skip_ahead_indices = random.sample(list(available_indices), num_skip_ahead)
+    available_indices -= set(skip_ahead_indices)
+    fall_back_indices = random.sample(list(available_indices), num_fall_back)
 
-        // Game State Variables
-        let playerPositions = [0, 0]; // Player 1, Player 2
-        let currentPlayer = 0; // 0 for Player 1, 1 for Player 2
-        let gameEnded = false;
+    # Assign skip ahead (ladder) tiles
+    for idx in skip_ahead_indices:
+        # Jump ahead by 3-8 tiles, but not past the end
+        jump = random.randint(3, 8)
+        target = min(idx + jump, num_tiles - 1)
+        tiles[idx].effect = "skip_ahead"
+        tiles[idx].target = target
 
-        // Board elements (snakes and ladders) - format: { start: end }
-        // Updated for a 50-tile board
-        const boardElements = {
-            ladders: {
-                2: 12, 5: 23, 10: 29, 17: 35, 24: 46,
-                30: 48, 38: 49
-            },
-            snakes: {
-                14: 4, 28: 8, 33: 13, 37: 15, 42: 21,
-                47: 26
-            }
-        };
+    # Assign fall back (snake) tiles
+    for idx in fall_back_indices:
+        # Fall back by 3-8 tiles, but not before start
+        drop = random.randint(3, 8)
+        target = max(idx - drop, 0)
+        tiles[idx].effect = "fall_back"
+        tiles[idx].target = target
 
-        // DOM Elements
-        const boardEl = document.getElementById('board');
-        const diceEl = document.getElementById('dice');
-        const rollDiceBtn = document.getElementById('rollDiceBtn');
-        const resetGameBtn = document.getElementById('resetGameBtn');
-        const messageBox = document.getElementById('messageBox');
-        let playerEls = []; // Array to hold player DOM elements
+    return tiles
 
-        /**
-         * Initializes the game board by creating cells and numbering them.
-         * Numbers cells in a Snakes and Ladders pattern (bottom-left to top-right, zig-zag).
-         */
-        function initializeBoard() {
-            boardEl.innerHTML = ''; // Clear existing board
-            let cellNumber = 1;
-            let cells = [];
-
-            // Create cells for the board
-            for (let row = 0; row < BOARD_ROWS; row++) {
-                let rowCells = [];
-                // Determine if row is odd or even for zig-zag numbering
-                const isEvenRow = (BOARD_ROWS - 1 - row) % 2 === 0;
-
-                for (let col = 0; col < BOARD_COLS; col++) {
-                    const cell = document.createElement('div');
-                    cell.classList.add('cell');
-                    cell.id = `cell-${cellNumber}`; // Assign ID for easy access
-
-                    // Store cell reference in a 2D array for accurate positioning
-                    rowCells.push(cell);
-                    cellNumber++;
-                }
-                cells.push(rowCells);
-            }
-
-            // Populate board with zig-zag numbering and append to DOM
-            cellNumber = 1; // Reset cell number for actual numbering
-            for (let row = 0; row < BOARD_ROWS; row++) {
-                const displayRow = BOARD_ROWS - 1 - row; // Actual row for display (bottom-up)
-                const isEvenDisplayRow = displayRow % 2 === 0;
-
-                if (isEvenDisplayRow) { // Even rows (0, 2, 4...) - left to right
-                    for (let col = 0; col < BOARD_COLS; col++) {
-                        const cell = cells[displayRow][col];
-                        cell.textContent = cellNumber;
-                        if (boardElements.ladders[cellNumber]) {
-                            cell.classList.add('bg-green-100'); // Light green for ladders
-                        } else if (boardElements.snakes[cellNumber]) {
-                            cell.classList.add('bg-red-100'); // Light red for snakes
-                        } else {
-                            // Alternate cell colors for better visibility
-                            if ((cellNumber % 2) === 0) {
-                                cell.classList.add('bg-blue-50');
-                            } else {
-                                cell.classList.add('bg-blue-100');
-                            }
-                        }
-                        boardEl.appendChild(cell);
-                        cellNumber++;
-                    }
-                } else { // Odd rows (1, 3, 5...) - right to left
-                    for (let col = BOARD_COLS - 1; col >= 0; col--) {
-                        const cell = cells[displayRow][col];
-                        cell.textContent = cellNumber;
-                        if (boardElements.ladders[cellNumber]) {
-                            cell.classList.add('bg-green-100');
-                        } else if (boardElements.snakes[cellNumber]) {
-                            cell.classList.add('bg-red-100');
-                        } else {
-                            if ((cellNumber % 2) === 0) {
-                                cell.classList.add('bg-blue-50');
-                            } else {
-                                cell.classList.add('bg-blue-100');
-                            }
-                        }
-                        boardEl.appendChild(cell);
-                        cellNumber++;
-                    }
-                }
-            }
-        }
-
-        /**
-         * Creates and positions player tokens on the board.
-         */
-        function createPlayers() {
-            playerEls = []; // Clear existing player elements
-            for (let i = 0; i < 2; i++) {
-                const player = document.createElement('div');
-                player.classList.add('player', `player-${i + 1}`);
-                player.textContent = i + 1; // Display player number
-                player.id = `player-${i + 1}`;
-                boardEl.appendChild(player);
-                playerEls.push(player);
-            }
-            updatePlayerPositionsUI(); // Place players at start (cell 1)
-        }
-
-        /**
-         * Updates the visual position of all players on the board.
-         */
-        function updatePlayerPositionsUI() {
-            playerPositions.forEach((pos, index) => {
-                const playerEl = playerEls[index];
-                if (pos === 0) {
-                    // Position at start, slightly offset from cell 1
-                    const startCell = document.getElementById('cell-1');
-                    if (startCell) {
-                        const cellRect = startCell.getBoundingClientRect();
-                        const boardRect = boardEl.getBoundingClientRect();
-                        // Adjust for board's relative positioning and multiple players
-                        let offsetX = index === 0 ? -PLAYER_OFFSET / 2 : PLAYER_OFFSET / 2;
-                        playerEl.style.left = `${cellRect.left - boardRect.left + (cellRect.width / 2) - (playerEl.offsetWidth / 2) + offsetX}px`;
-                        playerEl.style.top = `${cellRect.top - boardRect.top + (cellRect.height / 2) - (playerEl.offsetHeight / 2)}px`;
-                    }
-                } else {
-                    const targetCell = document.getElementById(`cell-${pos}`);
-                    if (targetCell) {
-                        const cellRect = targetCell.getBoundingClientRect();
-                        const boardRect = boardEl.getBoundingClientRect();
-                        // Adjust for board's relative positioning and multiple players
-                        let offsetX = index === 0 ? -PLAYER_OFFSET / 2 : PLAYER_OFFSET / 2;
-                        playerEl.style.left = `${cellRect.left - boardRect.left + (cellRect.width / 2) - (playerEl.offsetWidth / 2) + offsetX}px`;
-                        playerEl.style.top = `${cellRect.top - boardRect.top + (cellRect.height / 2) - (playerEl.offsetHeight / 2)}px`;
-                    }
-                }
-            });
-        }
-
-        /**
-         * Rolls the dice and updates the dice display.
-         * @returns {number} The dice roll result (1-6).
-         */
-        function rollDice() {
-            return Math.floor(Math.random() * 6) + 1;
-        }
-
-        /**
-         * Animates the dice roll and then updates the player's position.
-         */
-        async function handleDiceRoll() {
-            if (gameEnded) {
-                showMessage(`Game over! Player ${currentPlayer + 1} won.`);
-                return;
-            }
-
-            rollDiceBtn.disabled = true; // Disable button during roll
-            diceEl.classList.add('rolling');
-
-            // Simulate dice rolling animation
-            for (let i = 0; i < 10; i++) {
-                const randomRoll = rollDice();
-                diceEl.innerHTML = `<i class="${DICE_ICONS[randomRoll - 1]}"></i>`;
-                await new Promise(resolve => setTimeout(resolve, 80)); // Quick delay for animation
-            }
-
-            const diceValue = rollDice(); // Declare diceValue here
-            diceEl.innerHTML = `<i class="${DICE_ICONS[diceValue - 1]}"></i>`;
-            diceEl.classList.remove('rolling');
-
-            showMessage(`Player ${currentPlayer + 1} rolled a ${diceValue}.`);
-
-            movePlayer(diceValue);
-        }
-
-        /**
-         * Moves the current player based on the dice value.
-         * Handles game rules (snakes, ladders, winning).
-         * @param {number} steps The number of steps to move.
-         */
-        function movePlayer(steps) { // 'steps' is the dice value
-            let newPosition = playerPositions[currentPlayer] + steps;
-
-            // Ensure player doesn't overshoot the last cell (TOTAL_CELLS)
-            if (newPosition > TOTAL_CELLS) {
-                newPosition = TOTAL_CELLS - (newPosition - TOTAL_CELLS); // Bounce back if overshoot
-            }
-
-            playerPositions[currentPlayer] = newPosition;
-            updatePlayerPositionsUI();
-
-            // Check for winning condition
-            if (newPosition === TOTAL_CELLS) {
-                showMessage(`Player ${currentPlayer + 1} reached ${TOTAL_CELLS}! You win!`);
-                gameEnded = true;
-                rollDiceBtn.disabled = true;
-                resetGameBtn.classList.remove('hidden');
-                return;
-            }
-
-            // Check for snakes and ladders after a short delay for visual movement
-            setTimeout(() => {
-                const playerCurrentPos = playerPositions[currentPlayer];
-                let specialMoveText = '';
-
-                if (boardElements.ladders[playerCurrentPos]) {
-                    const oldPos = playerCurrentPos;
-                    const targetPos = boardElements.ladders[playerCurrentPos];
-                    playerPositions[currentPlayer] = targetPos;
-                    specialMoveText = `Player ${currentPlayer + 1} found a ladder from ${oldPos} to ${targetPos}!`;
-                    showMessage(specialMoveText);
-                } else if (boardElements.snakes[playerCurrentPos]) {
-                    const oldPos = playerCurrentPos;
-                    const targetPos = boardElements.snakes[playerCurrentPos];
-                    playerPositions[currentPlayer] = targetPos;
-                    specialMoveText = `Oh no! Player ${currentPlayer + 1} hit a snake from ${oldPos} to ${targetPos}!`;
-                    showMessage(specialMoveText);
-                }
-
-                updatePlayerPositionsUI(); // Update UI again if special move happened
-
-                // If a special move happened, check win condition again
-                if (playerPositions[currentPlayer] === TOTAL_CELLS) {
-                    showMessage(`Player ${currentPlayer + 1} reached ${TOTAL_CELLS}! You win!`);
-                    gameEnded = true;
-                    rollDiceBtn.disabled = true;
-                    resetGameBtn.classList.remove('hidden');
-                    return;
-                }
-
-                // Switch turn after current player's full move (and special moves)
-                if (steps !== 6) { // If roll is not 6, switch turn
-                    currentPlayer = 1 - currentPlayer; // Toggle between 0 and 1
-                } else {
-                    showMessage(`Player ${currentPlayer + 1} rolled a 6, roll again!`);
-                }
-                rollDiceBtn.disabled = false; // Re-enable button for next turn
-                showMessage(`It's Player ${currentPlayer + 1}'s turn.`);
-
-            }, 600); // Small delay to let the initial move animation finish
-        }
-
-        /**
-         * Displays a message in the message box.
-         * @param {string} message The message to display.
-         */
-        function showMessage(message) {
-            messageBox.textContent = message;
-            messageBox.classList.remove('hidden');
-        }
-
-        /**
-         * Resets the game to its initial state.
-         */
-        function resetGame() {
-            playerPositions = [0, 0];
-            currentPlayer = 0;
-            gameEnded = false;
-            updatePlayerPositionsUI();
-            rollDiceBtn.disabled = false;
-            resetGameBtn.classList.add('hidden');
-            messageBox.classList.add('hidden');
-            diceEl.innerHTML = `<i class="${DICE_ICONS[0]}"></i>`; // Reset dice to 1
-            showMessage("Game reset! Player 1's turn.");
-        }
-
-        // Event Listeners
-        rollDiceBtn.addEventListener('click', handleDiceRoll);
-        resetGameBtn.addEventListener('click', resetGame);
-
-        // Initial setup on window load
-        window.onload = function() {
-            initializeBoard();
-            createPlayers();
-            // Initial message
-            showMessage("Welcome! Player 1's turn.");
-        };
-
-        // Handle window resize to re-position players correctly
-        window.addEventListener('resize', () => {
-            updatePlayerPositionsUI();
-        });
-    </script>
-</body>
-</html>
+if __name__ == "__main__":
+    board = generate_board(num_tiles=30, num_skip_ahead=4, num_fall_back=4, seed=42)
+    for tile in board:
+        print(tile)
