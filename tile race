@@ -4,210 +4,777 @@
   <meta charset="UTF-8">
   <title>OSRS Tile Race Board</title>
   <style>
-    body {
-      background: #232323;
-      color: #ddd;
-      font-family: Arial, sans-serif;
-      padding: 20px;
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
     }
-    .board {
+    body {
+      min-height: 100vh;
+      min-width: 100vw;
+      height: 100vh;
+      width: 100vw;
+      background: #232323 url('https://oldschool.runescape.wiki/images/Old_School_RuneScape_logo.png') center center no-repeat;
+      background-size: 55vw auto;
+      color: #ddd; font-family:Arial,sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+    }
+    .main-center {
+      width: 100vw; height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .main-center * { pointer-events: auto; }
+    .controls {
+      display: flex; flex-direction: row; align-items: center; justify-content: center;
+      margin-bottom: 8px;
+    }
+    #roll-btn, #undo-btn {
+      font-size: 1.1em;
+      pointer-events: auto;
+    }
+    #roll-btn { margin: 0 8px 0 0; padding: 10px 18px;}
+    #undo-btn {
+      background: #fffbe0;
+      border: 1.5px solid #bdb76b; border-radius: 6px; padding: 10px 18px;
+      font-size: 1em; font-weight: bold; color: #a32a00; cursor: pointer;
+      box-shadow: 0 1.5px 6px #0005; transition: background 0.15s, color 0.15s, border 0.15s;
+      vertical-align: middle;
+    }
+    #undo-btn:disabled {
+      opacity: 0.55; cursor: not-allowed; color: #bdb76b; background: #e5e5e5;
+    }
+    #set-btn {
+      background: #fffbe0; border: 2px solid #bdb76b; border-radius: 50%;
+      width: 44px; height: 44px; font-size: 1.2em; font-weight: bold; color: #114a00;
+      box-shadow: 0 2px 12px #0007; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; position: fixed; right: 18px; bottom: 18px; z-index: 1100;
+    }
+    #set-btn img { width: 28px; height: 28px; }
+    .die-visual {
+      width: 48px; height: 48px; background: #fff; border-radius: 10px; border: 2.5px solid #fff;
+      display: flex; align-items: center; justify-content: center; position: relative;
+      box-shadow: 0 2px 8px #000c; margin: 0 0 4px 0;
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+    .die-dot { width: 10px; height: 10px; background: #000; border-radius: 50%; position: absolute; opacity: 0; transition: opacity 0.15s;}
+    .die-dot.show { opacity: 1; }
+    .dot-center   { left: 17px; top: 17px; }
+    .dot-top      { left: 17px; top: 5px; }
+    .dot-bottom   { left: 17px; top: 29px; }
+    .die-rolling { animation: die-shake 0.7s cubic-bezier(.5,2,.5,1) 1; }
+    @keyframes die-shake {
+      0%   { transform: rotate(0deg)   scale(1); }
+      20%  { transform: rotate(17deg)  scale(1.07);}
+      45%  { transform: rotate(-19deg) scale(0.97);}
+      65%  { transform: rotate(12deg)  scale(1.05);}
+      80%  { transform: rotate(-6deg)  scale(0.99);}
+      100% { transform: rotate(0deg)   scale(1); }
+    }
+    .die-result, #turn-indicator {
       display: flex;
-      flex-direction: row;
-      align-items: flex-end;
-      margin-bottom: 40px;
-      flex-wrap: wrap;
-      gap: 4px;
+      justify-content: center;
+      align-items: center;
+      margin: 8px 0 5px 0;
+      font-size: 1em;
+      text-align: center;
+      width: 100%;
+    }
+    #turn-indicator {
+      font-weight: bold;
+    }
+    #board-outer {
+      position: relative;
+      width: 80vw; height: 52vh;
+      max-width: 95vw;
+      max-height: 60vh;
+      min-width: 250px;
+      min-height: 120px;
+      display: flex; align-items: center; justify-content: center;
+      overflow: visible;
+      flex: none;
+      margin: 0 auto;
+    }
+    #board {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      user-select: none;
+    }
+    #snake-arrows {
+      position: absolute;
+      left: 0; top: 0; width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1;
     }
     .tile {
-      position: relative;
-      width: 70px;
-      height: 110px;
-      background: gold;
-      border-radius: 8px;
-      border: 2px solid #444;
-      margin: 2px;
+      position: absolute;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: flex-end;
-      transition: transform 0.2s;
-      box-shadow: 1px 2px 6px #0008;
+      justify-content: center;
+      box-sizing: border-box;
+      aspect-ratio: 1/1;
+      background: #3e2712; border-radius: 9px; border: 2px solid #a38259;
+      overflow: hidden;
+      font-size: 1em;
+      transition: width 0.12s, height 0.12s, left 0.12s, top 0.12s;
+      z-index: 2;
     }
-    .tile.skip-ahead { background: #44e044; }
-    .tile.fall-back { background: #e05050; }
-    .tile .index {
-      font-size: 1.1em;
-      font-weight: bold;
-      margin-bottom: 2px;
-      color: #222;
-      background: #ffe;
-      border-radius: 4px;
-      padding: 2px 8px;
+    .tile img.tile-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.84; z-index: 0; }
+    .tile img.tile-icon {
+      margin-bottom: 2px; z-index: 1;
+      max-width: 85%; max-height: 40%;
+      width: auto; height: auto;
+      display: block;
+    }
+    .tile .tile-index { position: absolute; top: 2px; left: 3px; font-size: 0.68em; color: #ffe; background: #222; border-radius: 3px; padding: 0px 4px; z-index: 2;}
+    .tile .tile-label { font-weight: bold; color: #ffe; z-index: 2;}
+    .tile .tile-item { color: #fff; text-align: center; z-index: 2;}
+    .tile .tile-piece {
+      position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+      font-size: 0.45em;
+      z-index: 3;
+      transition: font-size 0.12s;
+      line-height: 1;
+      height: 1em; width: 1em;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none;
+      user-select: none;
+    }
+    .tile.start { background: #257be6; border-color: #fff; color: #fff; }
+    .tile.finish { background: #ffd700; border-color: #fff700; color: #ad7c00; }
+    .tile.skip-ahead { 
+      box-shadow: 0 0 7px 2px #51ff00a0; 
+      border-color: #51ff00; 
+      background: #fff !important;
+    }
+    .tile.fall-back { box-shadow: 0 0 7px 2px #ff1a00a0; border-color: #ff1a00; }
+    .tile .tile-effect { position: absolute; right: 2px; top: 2px; font-size: 1em; z-index: 2;}
+    .tile .tile-effect-center {
       position: absolute;
-      top: 4px;
-      left: 4px;
-    }
-    .tile .item {
-      font-size: 0.92em;
-      margin-bottom: 10px;
-      text-align: center;
-      color: #fff;
-      padding: 2px 4px;
-      word-break: break-word;
-    }
-    .arrow {
-      position: absolute;
-      left: 100%;
-      top: 50%;
-      width: 40px;
-      height: 0;
-      border-top: 2px solid #0f0;
+      left: 50%; top: 50%; transform: translate(-50%,-50%);
+      font-weight: bold; color: #51ff00;
+      text-shadow: 0 0 6px #1e5700,0 0 2px #000,1px 1px 0 #1e5700,-1px -1px 0 #1e5700,0 2px 0 #000;
       z-index: 2;
       pointer-events: none;
+      user-select: none;
+      letter-spacing: 1px;
+      white-space: nowrap;
+      text-align: center;
     }
-    .arrow.fall-back {
-      border-top: 2px solid #f00;
-      left: -40px;
-      right: 100%;
-      transform: scaleX(-1);
+    .tile.fall-back .tile-effect-center { color: #ff2b2b; text-shadow:0 0 6px #b90000,0 0 2px #000,1px 1px 0 #960000,-1px -1px 0 #960000,0 2px 0 #000;}
+    .tile.skip-ahead .tile-icon, .tile.fall-back .tile-icon, .tile.skip-ahead .tile-item, .tile.fall-back .tile-item {
+      display: none !important;
     }
-    .arrow-head {
-      position: absolute;
-      width: 0; height: 0;
-      border-top: 8px solid transparent;
-      border-bottom: 8px solid transparent;
-      border-left: 12px solid #0f0;
-      left: 38px;
-      top: -9px;
+    .tile.start img.tile-bg {
+      object-fit: contain !important;
+      opacity: 1 !important;
+      background: #257be6;
+      z-index: 0;
     }
-    .arrow.fall-back .arrow-head {
-      border-left: 12px solid #f00;
-      left: -12px;
-      transform: scaleX(-1);
+    .tile.start .tile-label {
+      position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; background: rgba(0,0,0,0.36);
+      color: #fff; font-weight: bold; z-index: 2;
+      padding: 2px 0 1px 0;
     }
-    .controls {
-      margin: 20px 0;
-      display: flex;
-      align-items: center;
-      gap: 18px;
+    #undo-password-prompt, #set-password-prompt {
+      display: none;
+      background: #333; color: #f5e8cc; border: 2px solid #bdb76b; border-radius: 7px; padding: 12px 22px 16px 22px;
+      box-shadow: 0 2px 22px #000b; position: fixed; top: 50%; left: 50%; min-width: 240px; max-width: 94vw;
+      transform: translate(-50%, -50%); z-index: 1001; flex-direction: column; align-items: center;
     }
-    .die-result {
-      font-size: 1.4em;
-      font-weight: bold;
-      color: #f8f8a0;
-      min-width: 50px;
-      display: inline-block;
+    #undo-password-prompt label, #set-password-prompt label {
+      font-size: 1.04em; display: block; margin-bottom: 6px; font-weight: bold; color: #eec564; text-align: center;
     }
+    #undo-password-input, #set-password-input {
+      font-size: 1.07em; padding: 6px 10px; border-radius: 4px; border: 1.5px solid #bdb76b; outline: none; margin-bottom: 10px; margin-top: 2px; width: 180px; background: #222; color: #ffe; box-shadow: 0 1px 2px #0006;
+    }
+    #undo-password-prompt button, #set-password-prompt button {
+      font-size: 1em; padding: 5px 17px; background: #ffd700; color: #552a00; border: 1.5px solid #a08316; border-radius: 4px; font-weight: bold; cursor: pointer; margin: 0 5px; margin-top: 3px; transition: background .13s, color .13s, border .13s;
+    }
+    #undo-password-prompt button:hover, #set-password-prompt button:hover {
+      background: #ffe07a; color: #8b5d08; border-color: #c6b245;
+    }
+    #undo-password-error, #set-password-error {
+      color: #ff4c4c; font-size: 0.96em; margin: 6px 0 0 0; height: 20px; min-height: 20px; text-align: center;
+    }
+    #set-password-prompt .set-form-row {
+      margin-bottom: 10px; width: 100%; display: flex; align-items: center; gap: 8px; justify-content: center;
+    }
+    #set-password-prompt select, #set-password-prompt input[type="number"] {
+      font-size: 1.07em; padding: 6px 10px; border-radius: 4px; border: 1.5px solid #bdb76b; outline: none; width: 120px; background: #222; color: #ffe; box-shadow: 0 1px 2px #0006;
+    }
+    #set-password-prompt select { width: 120px; }
+    #set-password-prompt input[type="number"] { width: 70px; }
   </style>
 </head>
 <body>
-  <h1>OSRS Tile Race Board</h1>
-  <div class="controls">
-    <button id="roll-btn">Roll 3-sided Die</button>
+  <div class="main-center">
+    <div class="controls">
+      <button id="roll-btn">Roll</button>
+      <button id="undo-btn" title="Undo last roll" disabled>Undo</button>
+    </div>
+    <div class="die-visual" id="die-visual">
+      <div class="die-dot dot-center"   id="dot-center"></div>
+      <div class="die-dot dot-top"      id="dot-top"></div>
+      <div class="die-dot dot-bottom"   id="dot-bottom"></div>
+    </div>
     <span class="die-result" id="die-result"></span>
+    <div id="turn-indicator"></div>
+    <div id="board-outer">
+      <svg id="snake-arrows"></svg>
+      <div id="board"></div>
+    </div>
+    <button id="set-btn" title="Set team tile">
+      <img src="https://oldschool.runescape.wiki/images/Strength_icon_%28detail%29.png?a4903" alt="SET"/>
+    </button>
   </div>
-  <div id="board" class="board"></div>
+  <div id="undo-password-prompt">
+    <label for="undo-password-input">Enter password to undo:</label>
+    <input type="password" id="undo-password-input" autocomplete="off" />
+    <div>
+      <button id="undo-password-submit">OK</button>
+      <button id="undo-password-cancel">Cancel</button>
+    </div>
+    <div id="undo-password-error"></div>
+  </div>
+  <div id="set-password-prompt">
+    <label for="set-password-input">Enter password to set team tile:</label>
+    <input type="password" id="set-password-input" autocomplete="off" />
+    <div class="set-form-row">
+      <select id="set-team-select">
+        <option value="0">🔵 Blue Team</option>
+        <option value="1">🟡 Yellow Team</option>
+      </select>
+      <input type="number" id="set-tile-input" min="0" max="51" placeholder="Tile #" />
+    </div>
+    <div>
+      <button id="set-password-submit">OK</button>
+      <button id="set-password-cancel">Cancel</button>
+    </div>
+    <div id="set-password-error"></div>
+  </div>
   <script>
-    // --- Board generation logic ---
-    const OSRS_ITEMS = [
-      "Bronze sword", "Iron pickaxe", "Cowhide", "Rune scimitar", "Dragon scimitar",
-      "Partyhat", "Abyssal whip", "Saradomin brew", "Zulrah's scales", "Barrows gloves",
-      "Rune platebody", "Mithril platebody", "Dragon pickaxe", "Bandos tassets",
-      "Armadyl godsword", "Sanfew serum", "Ring of wealth", "Fire cape", "Dragon bones", "Magic logs"
-    ];
+    // --- EXPANDED BOSS UNIQUE DROPS LIST ---
+    const ITEM_IMAGES = {
+      "Abyssal Whip": "https://oldschool.runescape.wiki/images/Abyssal_whip.png",
+      "Armadyl Chestplate": "https://oldschool.runescape.wiki/images/Armadyl_chestplate.png",
+      "Armadyl Chainskirt": "https://oldschool.runescape.wiki/images/Armadyl_chainskirt.png",
+      "Armadyl Crossbow": "https://oldschool.runescape.wiki/images/Armadyl_crossbow.png",
+      "Armadyl Helmet": "https://oldschool.runescape.wiki/images/Armadyl_helmet.png",
+      "Bandos Chestplate": "https://oldschool.runescape.wiki/images/Bandos_chestplate.png",
+      "Bandos Tassets": "https://oldschool.runescape.wiki/images/Bandos_tassets.png",
+      "Bandos Boots": "https://oldschool.runescape.wiki/images/Bandos_boots.png",
+      "Bandos Godsword": "https://oldschool.runescape.wiki/images/Bandos_godsword.png",
+      "Dragon Warhammer": "https://oldschool.runescape.wiki/images/Dragon_warhammer.png",
+      "Dragon Pickaxe": "https://oldschool.runescape.wiki/images/Dragon_pickaxe.png",
+      "Dragon Hunter Crossbow": "https://oldschool.runescape.wiki/images/Dragon_hunter_crossbow.png",
+      "Dragon Claws": "https://oldschool.runescape.wiki/images/Dragon_claws.png",
+      "Dragon Harpoon": "https://oldschool.runescape.wiki/images/Dragon_harpoon.png",
+      "Elder Maul": "https://oldschool.runescape.wiki/images/Elder_maul.png",
+      "Ghrazi Rapier": "https://oldschool.runescape.wiki/images/Ghrazi_rapier.png",
+      "Avernic Defender Hilt": "https://oldschool.runescape.wiki/images/Avernic_defender_hilt.png",
+      "Sanguinesti Staff": "https://oldschool.runescape.wiki/images/Sanguinesti_staff.png",
+      "Scythe of Vitur": "https://oldschool.runescape.wiki/images/Scythe_of_vitur.png",
+      "Justiciar Chestguard": "https://oldschool.runescape.wiki/images/Justiciar_chestguard.png",
+      "Justiciar Faceguard": "https://oldschool.runescape.wiki/images/Justiciar_faceguard.png",
+      "Justiciar Legguards": "https://oldschool.runescape.wiki/images/Justiciar_legguards.png",
+      "Twisted Bow": "https://oldschool.runescape.wiki/images/Twisted_bow.png",
+      "Kodai Insignia": "https://oldschool.runescape.wiki/images/Kodai_insignia.png",
+      "Dinh’s Bulwark": "https://oldschool.runescape.wiki/images/Dinh%27s_bulwark.png",
+      "Arcane Spirit Shield": "https://oldschool.runescape.wiki/images/Arcane_spirit_shield.png",
+      "Spectral Spirit Shield": "https://oldschool.runescape.wiki/images/Spectral_spirit_shield.png",
+      "Elysian Spirit Shield": "https://oldschool.runescape.wiki/images/Elysian_spirit_shield.png",
+      "Zaryte Crossbow": "https://oldschool.runescape.wiki/images/Zaryte_crossbow.png",
+      "Torva Full Helm": "https://oldschool.runescape.wiki/images/Torva_full_helm.png",
+      "Torva Platebody": "https://oldschool.runescape.wiki/images/Torva_platebody.png",
+      "Torva Platelegs": "https://oldschool.runescape.wiki/images/Torva_platelegs.png",
+      "Nightmare Staff": "https://oldschool.runescape.wiki/images/Nightmare_staff.png",
+      "Harmonised Orb": "https://oldschool.runescape.wiki/images/Harmonised_orb.png",
+      "Volatile Orb": "https://oldschool.runescape.wiki/images/Volatile_orb.png",
+      "Eldritch Orb": "https://oldschool.runescape.wiki/images/Eldritch_orb.png",
+      "Inquisitor’s Great Helm": "https://oldschool.runescape.wiki/images/Inquisitor%27s_great_helm.png",
+      "Inquisitor’s Hauberk": "https://oldschool.runescape.wiki/images/Inquisitor%27s_hauberk.png",
+      "Inquisitor’s Plateskirt": "https://oldschool.runescape.wiki/images/Inquisitor%27s_plateskirt.png",
+      "Voidwaker Blade": "https://oldschool.runescape.wiki/images/Voidwaker_blade.png",
+      "Voidwaker Hilt": "https://oldschool.runescape.wiki/images/Voidwaker_hilt.png",
+      "Voidwaker Gem": "https://oldschool.runescape.wiki/images/Voidwaker_gem.png",
+      "Ancient Godsword": "https://oldschool.runescape.wiki/images/Ancient_godsword.png",
+      "Sraracha": "https://oldschool.runescape.wiki/images/Sraracha.png",
+      "Kree'arra Pet": "https://oldschool.runescape.wiki/images/Pet_kree%27arra.png",
+      "K'ril Tsutsaroth Pet": "https://oldschool.runescape.wiki/images/Pet_kril_tsutsaroth.png",
+      "Commander Zilyana Pet": "https://oldschool.runescape.wiki/images/Pet_commander_zilyana.png",
+      "General Graardor Pet": "https://oldschool.runescape.wiki/images/Pet_general_graardor.png",
+      "Vorki": "https://oldschool.runescape.wiki/images/Vorki.png",
+      "Lil' Zik": "https://oldschool.runescape.wiki/images/Lil%27_zik.png",
+      "Omelette": "https://oldschool.runescape.wiki/images/Omelette.png",
+      "Jar of Chemicals": "https://oldschool.runescape.wiki/images/Jar_of_chemicals.png",
+      "Hydra Leather": "https://oldschool.runescape.wiki/images/Hydra_leather.png",
+      "Hydra Claw": "https://oldschool.runescape.wiki/images/Hydra_claw.png",
+      "Toxic Blowpipe": "https://oldschool.runescape.wiki/images/Toxic_blowpipe.png",
+      "Serpentine Visage": "https://oldschool.runescape.wiki/images/Serpentine_visage.png",
+      "Tanzanite Fang": "https://oldschool.runescape.wiki/images/Tanzanite_fang.png",
+      "Magma Mutagen": "https://oldschool.runescape.wiki/images/Magma_mutagen.png",
+      "Tanzanite Mutagen": "https://oldschool.runescape.wiki/images/Tanzanite_mutagen.png",
+      "Jar of Swamp": "https://oldschool.runescape.wiki/images/Jar_of_swamp.png",
+      "Sarachnis Cudgel": "https://oldschool.runescape.wiki/images/Sarachnis_cudgel.png",
+      "Giant Egg Sac": "https://oldschool.runescape.wiki/images/Giant_egg_sac.png"
+    };
 
-    function randomInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+    const GOBLIN_IMAGE = "https://oldschool.runescape.wiki/images/thumb/Goblin.png/800px-Goblin.png?3e49a";
+    const HIT_SPLAT_IMAGE = "https://oldschool.runescape.wiki/images/Damage_hitsplat.png?1977a";
+    const HEART_IMAGE = "https://oldschool.runescape.wiki/images/Hitpoints_icon_%28detail%29.png?a4903";
+    const ZUK_IMAGE = "https://oldschool.runescape.wiki/images/thumb/TzKal-Zuk.png/800px-TzKal-Zuk.png?2d222";
+    const OSRS_ITEMS = Object.keys(ITEM_IMAGES);
+    const NUM_TILES = 52;
+    const NUM_TEAMS = 2;
+    const TEAM_EMOJI = ["🔵", "🟡"];
+    let tiles = [], positions = Array(NUM_TEAMS).fill(0), winners = Array(NUM_TEAMS).fill(false),
+        currentTeam = 0, gameOver = false, undoStack = [];
+    const PASSWORD = "SLEPEadmin";
 
-    function shuffle(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i+1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+    let tilePositionsCache = [];
+    let tileSizeCache = 32;
+
+    function getSnakeyPathPositions(tileCount, nRows, nCols, hSpacing, vSpacing, curveAmplitude) {
+      let positions = [];
+      let idx = 0;
+      for (let row = 0; row < nRows; ++row) {
+        let y = row * vSpacing;
+        let rowCurve = Math.sin((row / (nRows-1)) * Math.PI) * curveAmplitude;
+        if (row % 2 === 0) {
+          for (let col = 0; col < nCols && idx < tileCount; ++col, ++idx) {
+            let x = col * hSpacing + rowCurve;
+            positions.push({left: x, top: y});
+          }
+        } else {
+          for (let col = nCols - 1; col >= 0 && idx < tileCount; --col, ++idx) {
+            let x = col * hSpacing - rowCurve;
+            positions.push({left: x, top: y});
+          }
+        }
       }
-      return arr;
+      return positions;
     }
 
-    function generateBoard(numTiles = 20, numSkipAhead = 3, numFallBack = 3) {
-      // Pick items
+    function generateBoard() {
+      const normalTiles = NUM_TILES - 2;
+      const skipAheadTiles = 7, fallBackTiles = 7;
       let items = [];
-      for (let i = 0; i < numTiles; ++i)
-        items.push(OSRS_ITEMS[randomInt(0, OSRS_ITEMS.length-1)]);
-      // Pick indices for effects
-      let available = [];
-      for (let i = 1; i < numTiles-1; ++i) available.push(i);
-      shuffle(available);
-      let skipAheadIndices = available.slice(0, numSkipAhead);
-      let fallBackIndices = available.slice(numSkipAhead, numSkipAhead + numFallBack);
-
-      // Build tiles
+      for (let i = 0; i < normalTiles; ++i)
+        items.push(OSRS_ITEMS[Math.floor(Math.random()*OSRS_ITEMS.length)]);
       let tiles = [];
-      for (let i = 0; i < numTiles; ++i)
-        tiles.push({ index: i, item: items[i], effect: null, target: null });
+      tiles.push({index:0, type:"start"});
+      for (let i=0; i<normalTiles; ++i) {
+        tiles.push({index:i+1, type:"normal", item:items[i], effect:null});
+      }
+      tiles.push({index:NUM_TILES-1, type:"finish"});
 
-      // Assign skip-ahead
-      for (let idx of skipAheadIndices) {
-        let jump = randomInt(3, 7);
-        let target = Math.min(idx + jump, numTiles-1);
-        if (target !== idx)
-          tiles[idx].effect = { type: "skip-ahead", target: target };
+      // Helper to space out indexes
+      function getSpacedIndexes(amount, min, max, minSpacing, excluded=[]) {
+        let possible = [];
+        for (let i = min; i <= max; ++i) {
+          if (excluded.includes(i)) continue;
+          possible.push(i);
+        }
+        let result = [];
+        while (result.length < amount && possible.length > 0) {
+          let idx = Math.floor(Math.random() * possible.length);
+          let val = possible[idx];
+          result.push(val);
+          // Remove indices within minSpacing of val from possible
+          possible = possible.filter(v => Math.abs(v - val) > minSpacing);
+        }
+        return result;
       }
-      // Assign fall-back
-      for (let idx of fallBackIndices) {
-        let drop = randomInt(3, 7);
-        let target = Math.max(idx - drop, 0);
-        if (target !== idx)
-          tiles[idx].effect = { type: "fall-back", target: target };
-      }
+      // We want to avoid the very first and last two tiles to avoid awkward placement
+      let skipIdxs = getSpacedIndexes(skipAheadTiles, 2, normalTiles - 3, 2);
+      let fallIdxs = getSpacedIndexes(fallBackTiles, 2, normalTiles - 3, 2, skipIdxs);
+
+      for (let i of skipIdxs) tiles[i+1].effect="skip-ahead";
+      for (let i of fallIdxs) tiles[i+1].effect="fall-back";
       return tiles;
     }
 
-    // --- Visualization ---
-    function renderBoard(tiles) {
-      const container = document.getElementById('board');
-      container.innerHTML = '';
-
-      tiles.forEach((tile, i) => {
-        const div = document.createElement('div');
-        div.className = 'tile';
-        if (tile.effect) {
-          if (tile.effect.type === 'skip-ahead') div.classList.add('skip-ahead');
-          if (tile.effect.type === 'fall-back') div.classList.add('fall-back');
+    function setTileSizes() {
+      const nRows = 4, nCols = 13, tileCount = 52;
+      const outer = document.getElementById('board-outer');
+      const w = outer.clientWidth, h = outer.clientHeight;
+      const hSpacing = Math.floor(w/(nCols+0.3));
+      const vSpacing = Math.floor(h/(nRows+0.3));
+      const tileSize = Math.max(16, Math.floor(Math.min(hSpacing, vSpacing) * 0.85));
+      tileSizeCache = tileSize;
+      const tileHSpace = Math.floor(hSpacing * 1.13);
+      const tileVSpace = Math.floor(vSpacing * 1.17);
+      const curveAmplitude = tileHSpace * 0.30;
+      let tilePositions = getSnakeyPathPositions(tileCount, nRows, nCols, tileHSpace, tileVSpace, curveAmplitude);
+      tilePositionsCache = tilePositions;
+      let minX = Math.min(...tilePositions.map(p=>p.left)), maxX = Math.max(...tilePositions.map(p=>p.left));
+      let minY = Math.min(...tilePositions.map(p=>p.top)), maxY = Math.max(...tilePositions.map(p=>p.top));
+      let pathW = maxX-minX+tileSize, pathH = maxY-minY+tileSize;
+      let offsetX = (w-pathW)/2 - minX, offsetY = (h-pathH)/2 - minY;
+      document.querySelectorAll('.tile').forEach((t, i) => {
+        let pos = tilePositions[i];
+        t.style.width = tileSize + "px";
+        t.style.height = tileSize + "px";
+        t.style.left = (pos.left+offsetX)+"px";
+        t.style.top = (pos.top+offsetY)+"px";
+        t.style.fontSize = (tileSize/22) + "em";
+        const label = t.querySelector('.tile-label');
+        if (label) label.style.fontSize = (tileSize * 0.14) + "px";
+        const item = t.querySelector('.tile-item');
+        if (item) item.style.fontSize = (tileSize * 0.10) + "px";
+        const idx = t.querySelector('.tile-index');
+        if (idx) idx.style.fontSize = (tileSize * 0.09) + "px";
+        const effect = t.querySelector('.tile-effect-center');
+        if (effect) effect.style.fontSize = (tileSize * 0.27) + "px";
+        const icon = t.querySelector('.tile-icon');
+        if (icon) {
+          icon.style.width = (tileSize * 0.55) + "px";
+          icon.style.height = (tileSize * 0.55) + "px";
+          icon.style.maxWidth = (tileSize * 0.85) + "px";
+          icon.style.maxHeight = (tileSize * 0.4) + "px";
         }
-        const idxSpan = document.createElement('span');
-        idxSpan.className = 'index';
-        idxSpan.textContent = tile.index;
-        div.appendChild(idxSpan);
-        const itemSpan = document.createElement('span');
-        itemSpan.className = 'item';
-        itemSpan.textContent = tile.item;
-        div.appendChild(itemSpan);
-
-        // Add arrows if needed
-        if (tile.effect) {
-          const arrow = document.createElement('div');
-          arrow.className = 'arrow'+(tile.effect.type === "fall-back" ? " fall-back" : "");
-          arrow.style.width = (Math.abs(tile.index - tile.effect.target) * 70 - 10) + "px";
-          const arrowHead = document.createElement('div');
-          arrowHead.className = 'arrow-head';
-          arrow.appendChild(arrowHead);
-          div.appendChild(arrow);
-        }
-        container.appendChild(div);
       });
+      document.querySelectorAll('.tile-piece').forEach(tp => {
+        tp.style.fontSize = (tileSize * 0.45) + "px";
+        tp.style.height = (tileSize * 0.45) + "px";
+        tp.style.width = (tileSize * 0.45) + "px";
+        tp.style.lineHeight = (tileSize * 0.45) + "px";
+      });
+      drawSnakeArrows(tilePositions, tileSize, offsetX, offsetY, nRows, nCols);
     }
 
-    // --- Die rolling logic ---
-    function rollDie3() {
-      return randomInt(1, 3);
+    function renderBoard() {
+      const board = document.getElementById('board');
+      board.innerHTML = '';
+      for (let i = 0; i < tiles.length; ++i) {
+        const tile = tiles[i];
+        const div = document.createElement('div');
+        div.className = "tile" + (tile.type==="start"?" start":"") + (tile.type==="finish"?" finish":"") +
+            (tile.effect==="skip-ahead"?" skip-ahead":"") + (tile.effect==="fall-back"?" fall-back":"");
+        if (tile.type === "start") {
+          div.innerHTML += `<img src="${GOBLIN_IMAGE}" class="tile-bg" alt="Goblin">`;
+          div.innerHTML += `<span class="tile-label">START</span>`;
+        } else if (tile.type === "finish") {
+          div.innerHTML += `<img src="${ZUK_IMAGE}" class="tile-bg" alt="Zuk">`;
+          div.innerHTML += `<span class="tile-label">FINISH</span>`;
+        } else if (tile.effect === "skip-ahead") {
+          div.innerHTML += `<img src="${HEART_IMAGE}" class="tile-bg" alt="Heart">`;
+          div.innerHTML += `<span class="tile-index">${tile.index}</span>`;
+          div.innerHTML += `<span class="tile-effect-center">+3</span>`;
+        } else if (tile.effect === "fall-back") {
+          div.innerHTML += `<img src="${HIT_SPLAT_IMAGE}" class="tile-bg" alt="Hitsplat">`;
+          div.innerHTML += `<span class="tile-index">${tile.index}</span>`;
+          div.innerHTML += `<span class="tile-effect-center">-3</span>`;
+        } else {
+          div.innerHTML += `<span class="tile-index">${tile.index}</span>`;
+          if (ITEM_IMAGES[tile.item]) {
+            div.innerHTML += `<img src="${ITEM_IMAGES[tile.item]}" class="tile-icon" alt="">`;
+          }
+          div.innerHTML += `<span class="tile-item">${tile.item}</span>`;
+        }
+        for(let t=0;t<NUM_TEAMS;++t) {
+          if (positions[t]===tile.index) {
+            div.innerHTML += `<span class="tile-piece">${TEAM_EMOJI[t]}</span>`;
+          }
+        }
+        board.appendChild(div);
+      }
+      setTileSizes();
     }
 
+    function drawSnakeArrows(tilePositions, tileSize, offsetX, offsetY, nRows, nCols) {
+      const svg = document.getElementById('snake-arrows');
+      svg.innerHTML = '';
+      svg.setAttribute('width', svg.parentElement.offsetWidth);
+      svg.setAttribute('height', svg.parentElement.offsetHeight);
+
+      for (let row = 0; row < nRows - 1; ++row) {
+        let fromIdx, toIdx;
+        if (row % 2 === 0) {
+          fromIdx = (row+1)*nCols-1;
+          toIdx = (row+1)*nCols;
+        } else {
+          fromIdx = (row+1)*nCols;
+          toIdx = (row+1)*nCols-1;
+        }
+        if (fromIdx >= tilePositions.length || toIdx >= tilePositions.length) continue;
+        let from = tilePositions[fromIdx];
+        let to = tilePositions[toIdx];
+
+        let fx = from.left + offsetX + tileSize / 2;
+        let fy = from.top + offsetY + tileSize / 2;
+        let tx = to.left + offsetX + tileSize / 2;
+        let ty = to.top + offsetY + tileSize / 2;
+
+        let dx = tx - fx, dy = ty - fy;
+        let fromEdgeX = fx, fromEdgeY = fy, toEdgeX = tx, toEdgeY = ty;
+
+        const pad = tileSize * 0.48;
+        let norm = Math.sqrt(dx*dx+dy*dy);
+        if (norm > 0.01) {
+          fromEdgeX = fx + dx/norm * pad;
+          fromEdgeY = fy + dy/norm * pad;
+          toEdgeX = tx - dx/norm * pad;
+          toEdgeY = ty - dy/norm * pad;
+        }
+
+        let curveDirection = (row%2 === 0) ? 1 : -1;
+        let cx = (fromEdgeX + toEdgeX) / 2 + curveDirection * tileSize * 2.3;
+        let cy = (fromEdgeY + toEdgeY) / 2 + tileSize * 1.2;
+
+        let path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", `M${fromEdgeX},${fromEdgeY} Q${cx},${cy} ${toEdgeX},${toEdgeY}`);
+        path.setAttribute("stroke", "#fae364");
+        path.setAttribute("stroke-width", Math.max(5, tileSize*0.2));
+        path.setAttribute("fill", "none");
+        path.setAttribute("marker-end", "url(#arrowhead)");
+        path.setAttribute("opacity", "0.96");
+        svg.appendChild(path);
+      }
+
+      let defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      defs.innerHTML = `
+      <marker id="arrowhead" markerWidth="20" markerHeight="20" refX="14" refY="10" orient="auto" markerUnits="strokeWidth">
+        <polygon points="0 0, 20 10, 0 20" fill="#fae364" opacity="1"/>
+      </marker>`;
+      svg.insertBefore(defs, svg.firstChild);
+    }
+
+    function updateTurn() {
+      let ti = document.getElementById('turn-indicator');
+      if (gameOver) {
+        let winnerTeams = [];
+        for (let t = 0; t < NUM_TEAMS; ++t) if (winners[t]) winnerTeams.push(TEAM_EMOJI[t]);
+        ti.textContent = `🏆 Winner: ${winnerTeams.join(", ")}`;
+      } else {
+        ti.textContent = `${TEAM_EMOJI[currentTeam]}'s turn`;
+      }
+    }
+    function saveUndoState() {
+      undoStack.push({
+        positions: [...positions],
+        winners: [...winners],
+        currentTeam,
+        gameOver,
+        dieResultHtml: document.getElementById('die-result').innerHTML
+      });
+      document.getElementById('undo-btn').disabled = false;
+    }
+    function restoreUndoState() {
+      if (!undoStack.length) return false;
+      const state = undoStack.pop();
+      positions = [...state.positions];
+      winners = [...state.winners];
+      currentTeam = state.currentTeam;
+      gameOver = state.gameOver;
+      document.getElementById('die-result').innerHTML = state.dieResultHtml;
+      renderBoard();
+      updateTurn();
+      clearDie();
+      if (!undoStack.length) {
+        document.getElementById('undo-btn').disabled = true;
+      }
+      return true;
+    }
+    function movePlayer(team, roll) {
+      let pos = positions[team];
+      let next = Math.min(pos+roll, NUM_TILES-1);
+      let msg = "";
+      if (tiles[next].effect==="skip-ahead") {
+        next = Math.min(next+3, NUM_TILES-1);
+        msg = " (skip ahead +3) ";
+      }
+      if (tiles[next].effect==="fall-back") {
+        next = Math.max(next-3, 0);
+        msg = " (fall back -3) ";
+      }
+      positions[team]=next;
+      if (next===NUM_TILES-1) {
+        winners[team]=true;
+        gameOver = true;
+      }
+      renderBoard();
+      return msg;
+    }
+    function rollDie3() { return 1 + Math.floor(Math.random()*3); }
+    function animateDieRoll(finalResult, cb) {
+      const die = document.getElementById('die-visual');
+      clearDie();
+      die.classList.add('die-rolling');
+      let ticks = 0, faces = [1,2,3], interval;
+      interval = setInterval(() => {
+        clearDie();
+        showDie(faces[Math.floor(Math.random()*faces.length)]);
+        ticks++;
+        if (ticks > 8) {
+          clearInterval(interval);
+          setTimeout(() => {
+            clearDie();
+            showDie(finalResult);
+            die.classList.remove('die-rolling');
+            if (cb) cb();
+          }, 100);
+        }
+      }, 80);
+    }
+    function showDie(result) {
+      document.getElementById('dot-center').classList.remove('show');
+      document.getElementById('dot-top').classList.remove('show');
+      document.getElementById('dot-bottom').classList.remove('show');
+      if (result === 1) {
+        document.getElementById('dot-center').classList.add('show');
+      } else if (result === 2) {
+        document.getElementById('dot-top').classList.add('show');
+        document.getElementById('dot-bottom').classList.add('show');
+      } else if (result === 3) {
+        document.getElementById('dot-top').classList.add('show');
+        document.getElementById('dot-center').classList.add('show');
+        document.getElementById('dot-bottom').classList.add('show');
+      }
+    }
+    function clearDie() {
+      document.getElementById('dot-center').classList.remove('show');
+      document.getElementById('dot-top').classList.remove('show');
+      document.getElementById('dot-bottom').classList.remove('show');
+    }
     document.getElementById('roll-btn').addEventListener('click', () => {
+      if (gameOver) return;
+      saveUndoState();
+      document.getElementById('die-result').textContent = "";
       const result = rollDie3();
-      document.getElementById('die-result').textContent = `You rolled: ${result}`;
+      animateDieRoll(result, function() {
+        let oldPos = positions[currentTeam];
+        let extra = movePlayer(currentTeam, result);
+        let newPos = positions[currentTeam];
+        let tile = tiles[newPos];
+        let tileDesc = "";
+        if (tile.type === "start") {
+          tileDesc = "Start tile";
+        } else if (tile.type === "finish") {
+          tileDesc = "Finish tile";
+        } else if (tile.effect === "skip-ahead") {
+          tileDesc = "+3 (Skip ahead)";
+        } else if (tile.effect === "fall-back") {
+          tileDesc = "-3 (Fall back)";
+        } else if (tile.item) {
+          tileDesc = tile.item;
+        } else {
+          tileDesc = "Normal tile";
+        }
+        document.getElementById('die-result').textContent =
+          `${TEAM_EMOJI[currentTeam]} rolled: ${result}${extra} Now on tile #${tile.index}: ${tileDesc}`;
+        if (!gameOver) {
+          do {
+            currentTeam = (currentTeam+1)%NUM_TEAMS;
+          } while (winners[currentTeam]);
+        }
+        updateTurn();
+      });
     });
-
-    // --- Run ---
-    const tiles = generateBoard(20, 3, 3);
-    renderBoard(tiles);
+    const undoBtn = document.getElementById('undo-btn');
+    const undoPromptDiv = document.getElementById('undo-password-prompt');
+    const undoInput = document.getElementById('undo-password-input');
+    const undoSubmitBtn = document.getElementById('undo-password-submit');
+    const undoCancelBtn = document.getElementById('undo-password-cancel');
+    const undoErrorDiv = document.getElementById('undo-password-error');
+    undoBtn.addEventListener('click', () => {
+      if (undoBtn.disabled) return;
+      undoPromptDiv.style.display = 'flex';
+      undoInput.value = '';
+      undoErrorDiv.textContent = '';
+      setTimeout(() => { undoInput.focus(); }, 80);
+    });
+    function hideUndoPrompt() {
+      undoPromptDiv.style.display = 'none';
+      undoInput.value = '';
+      undoErrorDiv.textContent = '';
+    }
+    function handleUndoPasswordSubmit() {
+      if (undoInput.value === PASSWORD) {
+        hideUndoPrompt();
+        restoreUndoState();
+      } else {
+        undoErrorDiv.textContent = "Incorrect password.";
+        undoInput.value = '';
+        undoInput.focus();
+      }
+    }
+    undoSubmitBtn.addEventListener('click', handleUndoPasswordSubmit);
+    undoCancelBtn.addEventListener('click', hideUndoPrompt);
+    undoInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleUndoPasswordSubmit();
+      if (e.key === 'Escape') hideUndoPrompt();
+    });
+    const setBtn = document.getElementById('set-btn');
+    const setPromptDiv = document.getElementById('set-password-prompt');
+    const setInput = document.getElementById('set-password-input');
+    const setTeamSelect = document.getElementById('set-team-select');
+    const setTileInput = document.getElementById('set-tile-input');
+    const setSubmitBtn = document.getElementById('set-password-submit');
+    const setCancelBtn = document.getElementById('set-password-cancel');
+    const setErrorDiv = document.getElementById('set-password-error');
+    setBtn.addEventListener('click', () => {
+      setPromptDiv.style.display = 'flex';
+      setInput.value = '';
+      setErrorDiv.textContent = '';
+      setTeamSelect.value = "0";
+      setTileInput.value = "";
+      setTimeout(() => { setInput.focus(); }, 80);
+    });
+    function hideSetPrompt() {
+      setPromptDiv.style.display = 'none';
+      setInput.value = '';
+      setErrorDiv.textContent = '';
+      setTileInput.value = "";
+    }
+    function handleSetSubmit() {
+      if (setInput.value !== PASSWORD) {
+        setErrorDiv.textContent = "Incorrect password.";
+        setInput.value = '';
+        setInput.focus();
+        return;
+      }
+      const team = parseInt(setTeamSelect.value, 10);
+      let tile = parseInt(setTileInput.value, 10);
+      if (Number.isNaN(tile) || tile < 0 || tile >= NUM_TILES) {
+        setErrorDiv.textContent = `Tile must be between 0 and ${NUM_TILES-1}`;
+        setTileInput.focus();
+        return;
+      }
+      hideSetPrompt();
+      saveUndoState();
+      positions[team] = tile;
+      if (positions[team] !== NUM_TILES-1) winners[team] = false;
+      if (positions[team] === NUM_TILES-1) winners[team] = true;
+      renderBoard();
+      updateTurn();
+      document.getElementById('die-result').innerHTML = `${TEAM_EMOJI[team]} set to tile ${tile}.`;
+    }
+    setSubmitBtn.addEventListener('click', handleSetSubmit);
+    setCancelBtn.addEventListener('click', hideSetPrompt);
+    setInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSetSubmit();
+      if (e.key === 'Escape') hideSetPrompt();
+    });
+    setTileInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSetSubmit();
+      if (e.key === 'Escape') hideSetPrompt();
+    });
+    setTeamSelect.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSetSubmit();
+      if (e.key === 'Escape') hideSetPrompt();
+    });
+    function fitBoard() { renderBoard(); }
+    window.addEventListener('resize', fitBoard);
+    tiles = generateBoard();
+    renderBoard();
+    updateTurn();
+    showDie(1);
   </script>
 </body>
 </html>
