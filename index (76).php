@@ -1,0 +1,2054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OSRS Tile Race Board</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-check-compat.js"></script>
+  <!-- Almendra Font for thematic, readable style -->
+  <link href="https://fonts.googleapis.com/css2?family=Almendra:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Almendra', Georgia, serif;
+      background: #141415 url('https://oldschool.runescape.wiki/images/thumb/The_Nightmare_Concept_Art.jpg/1920px-The_Nightmare_Concept_Art.jpg?2a751') center center/cover no-repeat fixed;
+      color: #eee;
+    }
+    .main-center {
+      max-width: 1160px;
+      margin: 44px auto 0 auto;
+      padding: 0 12px;
+      background: rgba(20, 20, 21, 0.90);
+      border-radius: 18px;
+      box-shadow: 0 0 32px #000a;
+    }
+    .hidden { display: none !important; }
+    #lobby {
+      max-width: 400px;
+      margin: 60px auto 0 auto;
+      background: rgba(35,36,38,0.95);
+      border-radius: 11px;
+      padding: 34px 24px 30px 24px;
+      box-shadow: 0 0 24px #000a;
+      text-align: center;
+    }
+    #lobby h2 {
+      font-family: 'Almendra', Georgia, serif;
+      font-size: 2.3em;
+      color: #ffe600;
+      margin-bottom: 23px;
+      margin-top: 0;
+      letter-spacing: 1px;
+      text-shadow: 1px 2px 5px #000a;
+    }
+    #lobby input, #lobby select, #lobby button {
+      font-size: 1.14em;
+      padding: 7px 13px;
+      margin: 9px 0;
+      border-radius: 7px;
+      border: none;
+      outline: none;
+      font-family: inherit;
+      background: #232323;
+      color: #fff;
+      margin-bottom: 15px;
+    }
+    #lobby input[type="text"] { width: 86%; }
+    #lobby .emoji-pick {
+      display: flex; flex-wrap: wrap; gap: 7px;
+      justify-content: center; margin-bottom: 12px; margin-top: 12px;
+    }
+    #lobby .emoji-pick span {
+      font-size: 2em; padding: 3px 9px;
+      border-radius: 6px; cursor: pointer;
+      border: 2px solid #555;
+      background: #1a1a1c;
+      transition: border 0.15s, background 0.15s;
+      user-select: none;
+      font-family: 'Almendra', Georgia, serif;
+    }
+    #lobby .emoji-pick .picked {
+      border: 2px solid #ffe600;
+      background: #23281c;
+      box-shadow: 0 0 9px #ffe60066;
+    }
+    #lobby .emoji-pick .unavailable {
+      opacity: 0.32;
+      pointer-events: none;
+      text-decoration: line-through;
+    }
+    #lobby .err {
+      color: #ff4444;
+      font-size: 1.1em;
+      margin-bottom: 6px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px #000a;
+      min-height: 22px;
+    }
+    #lobby .info {
+      color: #bce5ff;
+      font-size: 1em;
+      margin-bottom: 8px;
+      min-height: 20px;
+    }
+    #room-info-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #15161a;
+      border-radius: 11px;
+      padding: 6px 18px;
+      margin: 12px auto 15px auto;
+      font-size: 1.14em;
+      max-width: 960px;
+      box-shadow: 0 1px 7px #0006;
+    }
+    #room-info-bar .player-list {
+      display: flex; gap: 8px;
+      align-items: center;
+    }
+    #room-info-bar .player-chip {
+      display: flex; align-items: center;
+      background: #21282f;
+      border-radius: 8px;
+      padding: 2px 8px 2px 4px;
+      font-size: 1.07em;
+      margin-right: 2px;
+      border: 2px solid #343a44;
+    }
+    #room-info-bar .player-chip.admin {
+      border: 2px solid #ffe600;
+      background: #282f1a;
+      color: #ffe600;
+    }
+    #room-info-bar .player-chip.me {
+      border: 2px solid #bce5ff;
+      background: #22283f;
+      color: #bce5ff;
+    }
+    #room-info-bar .player-chip .emoji {
+      font-size: 1.29em; margin-right: 4px;
+      font-family: 'Almendra', Georgia, serif;
+    }
+    #room-info-bar .room-code {
+      color: #ffe600;
+      font-family: monospace;
+      font-size: 1.19em;
+      user-select: all;
+      letter-spacing: 1.4px;
+    }
+    #board-outer {
+      background: rgba(24, 24, 26, 0.82);
+      border-radius: 22px;
+      margin: 28px auto 0 auto;
+      padding: 18px 8px 28px 8px;
+      box-shadow: 0 0 22px #000a;
+      border: 2px solid #333;
+      min-width: 320px;
+      overflow-x: auto;
+      transition: background 0.3s;
+    }
+    #board {
+      display: grid;
+      gap: 8px;
+      min-height: 520px;
+      min-width: 320px;
+      max-width: 99vw;
+      margin: 0 auto;
+      transition: grid-template-columns 0.3s, grid-template-rows 0.3s;
+    }
+    .tile {
+  background: linear-gradient(120deg, rgba(40,44,58,0.80) 80%, rgba(26,29,35,0.75) 100%);
+  border-radius: 12px;
+  border: 2px solid #424242;
+  position: relative;
+  min-height: 110px;
+  min-width: 100px;
+  font-size: 1.12em;
+  text-align: center;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* <-- changed from flex-end to center */
+  align-items: center;
+  box-sizing: border-box;
+  transition: background 0.18s, border 0.18s, box-shadow 0.16s, filter 0.12s;
+  z-index: 1;
+  box-shadow: 0 2px 10px #0007;
+  cursor: pointer;
+  font-family: 'Almendra', Georgia, serif;
+}
+    .tile .tile-label {
+      font-size: 1.18em;
+      color: #ffe600;
+      font-weight: bold;
+      letter-spacing: 1px;
+      position: absolute;
+      top: 17px;
+      left: 0;
+      width: 100%;
+      text-shadow: 1px 1px 5px #000a;
+      z-index: 2;
+      font-family: 'Almendra', Georgia, serif;
+    }
+    .tile .tile-bg {
+  width: 62px;
+  height: 62px;
+  opacity: 0.65;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+  filter: drop-shadow(1px 2px 2px #000b);
+}
+    .tile .tile-index {
+      color: #bce5ff;
+      font-size: 1.05em;
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-family: Arial, sans-serif;
+      opacity: 0.72;
+      z-index: 2;
+      text-shadow: 1px 1px 2px #000;
+      pointer-events: none;
+    }
+    .tile .tile-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;    /* <-- Add this line */
+  flex: 1 1 auto;  /* This is fine, but height: 100% is crucial */
+}
+    .tile .tile-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 0 2px 0;
+      display: block;
+      align-self: center;
+      object-fit: contain;
+    }
+    .tile .tile-item {
+      font-size: 1.12em;
+      color: #ffe9b1;
+      font-family: 'Almendra', Georgia, serif;
+      text-shadow: 1px 1px 1px #000b;
+      margin-bottom: 3px;
+      z-index: 2;
+      position: relative;
+      margin-top: 0;
+      text-align: center;
+      word-break: break-word;
+      line-height: 1.1;
+    }
+    .tile .tile-effect-center {
+      font-size: 1.4em;
+      color: #b7ff72;
+      position: absolute;
+      top: 52%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: bold;
+      z-index: 3;
+      text-shadow: 2px 2px 4px #000;
+      background: #222b;
+      border-radius: 7px;
+      padding: 2px 11px;
+      border: 1px solid #2a3b10;
+      font-family: 'Almendra', Georgia, serif;
+    }
+    .tile.skip-ahead {
+      background: linear-gradient(120deg,rgba(55,94,29,0.82) 70%,rgba(37,50,19,0.75) 100%);
+      border-color: #b7ff72;
+      box-shadow: 0 0 14px 2px #b7ff724d, 0 2px 8px #000a;
+    }
+    .tile.skip-ahead .tile-effect-center {
+      color: #b7ff72;
+      border-color: #b7ff72;
+      text-shadow: 1px 1px 2px #2a3b10;
+    }
+    .tile.fall-back {
+      background: linear-gradient(120deg,rgba(117,33,33,0.80) 70%,rgba(42,22,22,0.75) 100%);
+      border-color: #ff8181;
+      box-shadow: 0 0 14px 2px #ff81814d, 0 2px 8px #000a;
+    }
+    .tile.fall-back .tile-effect-center {
+      color: #ff8181;
+      border-color: #ff8181;
+      text-shadow: 1px 1px 2px #3b1010;
+    }
+    .tile.start {
+      background: linear-gradient(120deg,rgba(58,85,43,0.85) 90%,rgba(30,45,20,0.80) 100%);
+      border-color: #ffe600;
+      box-shadow: 0 0 15px 2px #ffe60066, 0 2px 8px #000a;
+    }
+    .tile.finish {
+      background: linear-gradient(120deg,rgba(232,118,24,0.85) 80%,rgba(152,44,15,0.80) 100%);
+      border-color: #ffe600;
+      box-shadow: 0 0 18px 3px #ffe60077, 0 2px 8px #000a;
+    }
+    .tile-pieces {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  bottom: 11px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  font-size: 1.3em;  /* <-- was 1.7em, now smaller */
+  gap: 2px;
+  background: #1a1b1cbb;
+  border-radius: 8px;
+  padding: 1px 10px;
+  border: 1px solid #333;
+  box-shadow: 1px 1px 6px #0007;
+  font-family: 'Almendra', Georgia, serif;
+}
+    .tile-pieces.shared {
+      background: #232b3fdd;
+    }
+    .tile-piece {
+  font-size: 1.1em; /* <-- was 1.22em, now slightly smaller */
+  margin: 1px 0.7px;
+  text-shadow: 1px 1px 2px #000c, 0 0 4px #fff7;
+  transition: font-size 0.17s, transform 0.17s;
+  font-family: 'Almendra', Georgia, serif;
+}
+    .tile-pieces.shared .tile-piece {
+  font-size: 0.85em; /* <-- was 0.95em, now smaller */
+  transform: scale(0.78);
+  margin: 1px -3px;
+}
+    @media (max-width: 900px) {
+      .tile { min-width: 64px; min-height: 64px; font-size: 1em; }
+      .tile .tile-icon { width: 40px; height: 40px; }
+      .tile .tile-bg { width: 42px; height: 42px; }
+      .tile-pieces { font-size: 1.01em; }
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+      margin-top: 2px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .dice-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    #roll-btn, #undo-btn {
+      font-size: 1.3em;
+      background: #232323;
+      color: #fff;
+      border: 2px solid #ffe600;
+      border-radius: 10px;
+      box-shadow: 1px 2px 3px #000b;
+      padding: 7px 20px;
+      cursor: pointer;
+      transition: background 0.14s, color 0.13s, border 0.16s;
+      font-family: 'Almendra', Georgia, serif;
+      font-weight: bold;
+      outline: none;
+    }
+    #roll-btn:disabled, #undo-btn:disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      color: #ccc;
+    }
+    #undo-btn { margin-left: 0; }
+    .die-visual {
+      width: 54px; height: 54px;
+      background: #262626;
+      border: 2px solid #ffe600;
+      border-radius: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: 1px 2px 3px #000b;
+      margin-right: 8px;
+      margin-left: 8px;
+    }
+    .die-dot {
+      width: 8px; height: 8px;
+      background: #ffe600;
+      border-radius: 50%;
+      position: absolute;
+      opacity: 0;
+      transition: opacity 0.08s;
+    }
+    .dot-center       { top: 23px; left: 23px; }
+    .dot-top          { top: 8px;  left: 23px; }
+    .dot-bottom       { top: 38px; left: 23px; }
+    .dot-left         { top: 23px; left: 8px; }
+    .dot-right        { top: 23px; left: 38px; }
+    .dot-top-left     { top: 8px;  left: 8px; }
+    .dot-bottom-right { top: 38px; left: 38px; }
+    .dot-bottom-left  { top: 38px; left: 8px; }
+    .dot-top-right    { top: 8px;  left: 38px; }
+    .show-dot-1 .dot-center { opacity:1; }
+    .show-dot-2 .dot-top, .show-dot-2 .dot-bottom { opacity:1; }
+    .show-dot-3 .dot-top, .show-dot-3 .dot-center, .show-dot-3 .dot-bottom { opacity:1; }
+    .show-dot-4 .dot-top-left, .show-dot-4 .dot-top-right, .show-dot-4 .dot-bottom-left, .show-dot-4 .dot-bottom-right { opacity:1; }
+    .show-dot-5 .dot-top-left, .show-dot-5 .dot-top-right, .show-dot-5 .dot-center, .show-dot-5 .dot-bottom-left, .show-dot-5 .dot-bottom-right { opacity:1; }
+    .show-dot-6 .dot-top-left, .show-dot-6 .dot-left, .show-dot-6 .dot-bottom-left,
+    .show-dot-6 .dot-top-right, .show-dot-6 .dot-right, .show-dot-6 .dot-bottom-right { opacity:1; }
+    .die-result {
+      font-size: 1.8em;
+      font-family: 'Almendra', Georgia, serif;
+      color: #fff !important;
+      margin-bottom: 4px;
+      text-align: center;
+      display: block;
+      letter-spacing: 1.2px;
+      transition: transform 0.4s cubic-bezier(.17,.67,.83,.67), filter 0.3s;
+    }
+    .die-result.rolling {
+      animation: die-roll-spin 0.7s cubic-bezier(.4,2,.6,.9);
+      filter: blur(2px) brightness(1.2);
+      color: #fffbe7;
+      transform: scale(1.25) rotate(6deg);
+    }
+    @keyframes die-roll-spin {
+      0%   { filter: blur(7px) brightness(1.3); transform: scale(1) rotate(0deg);}
+      30%  { filter: blur(5px) brightness(1.15); transform: scale(1.2) rotate(7deg);}
+      60%  { filter: blur(3px) brightness(1.05); transform: scale(0.8) rotate(-7deg);}
+      80%  { filter: blur(2px) brightness(1.12); transform: scale(1.18) rotate(6deg);}
+      100% { filter: blur(0) brightness(1.0); transform: scale(1) rotate(0deg);}
+    }
+   #sword-btn-float, #reset-btn-float, #kick-btn-float, #log-btn-float, #verification-btn-float,  #leave-room-btn {
+      position: fixed;
+      z-index: 1000;
+      font-size: 2em;
+      background: #18181a;
+      border: 2px solid #ffe600;
+      border-radius: 50%;
+      color: #ffe600;
+      width: 54px; height: 54px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 1px 2px 3px #000b;
+      margin: 0;
+      padding: 0;
+      outline: none;
+      font-family: 'Almendra', Georgia, serif;
+    }
+    #coffee-btn-float {
+  position: fixed;
+  left: 3vw;
+  bottom: 2vw;
+  z-index: 1000;
+  font-size: 2em;
+  background: #18181a;
+  border: 2px solid #ffe600;
+  border-radius: 50%;
+  color: #ffe600;
+  width: 54px;
+  height: 54px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 1px 2px 3px #000b;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  font-family: 'Almendra', Georgia, serif;
+}
+#coffee-btn-float:hover {
+  background: #232b3f;
+  color: #fff;
+  border-color: #ffbe84;
+}
+    #sword-btn-float { right: 3vw; top: 2vw; }
+    #reset-btn-float { right: 3vw; bottom: 2vw; }
+    #kick-btn-float  { right: 3vw; top: 8vw; }
+    #log-btn-float   { right: 3vw; top: 14vw; }
+    #verification-btn-float { right: 3vw; top: 20vw; }
+    #leave-room-btn {
+      left: 3vw;
+      top: 2vw;
+      display: none;
+    }
+    @media (max-width: 600px) {
+  #sword-btn-float { top: 3vw; }
+  #kick-btn-float  { top: 18vw; }
+  #log-btn-float   { top: 33vw; }
+  #verification-btn-float { top: 48vw; }
+}
+    #wait-overlay { display:none; }
+    #lobby-roomcode-create, #lobby-roomcode-join {
+      font-family: Consolas, Menlo, Monaco, 'Lucida Console', monospace !important;
+      letter-spacing: 1.3px;
+      font-size: 1.17em;
+      background: #21242a;
+    }
+    .tile-flip {
+      perspective: 700px;
+      cursor: pointer;
+    }
+    .tile-inner {
+      transition: transform 0.6s;
+      transform-style: preserve-3d;
+      position: relative;
+      width: 100%; height: 100%;
+    }
+    .tile-flipped .tile-inner {
+      transform: rotateY(180deg);
+    }
+    .tile-front, .tile-back {
+      position: absolute;
+      width: 100%; height: 100%;
+      backface-visibility: hidden;
+      top: 0; left: 0;
+    }
+    .tile-back {
+      transform: rotateY(180deg);
+      background: #1c232b;
+      color: #ffe600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.82em;
+      padding: 7px;
+      box-shadow: 0 0 10px #0008 inset;
+      border-radius: 12px;
+      z-index: 2;
+      overflow-wrap: break-word;
+      overflow-y: auto;
+      text-align: center;
+      max-width: 100%;
+      max-height: 100%;
+      word-break: break-word;
+      white-space: pre-line;
+      width: 100%;
+      height: 100%;
+      font-family: 'Almendra', Georgia, serif;
+      box-sizing: border-box;
+    }
+    .tile-front { z-index: 1; }
+    .tile-type-label {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 8px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+.tile-type-label input {
+  margin-right: 4px;
+}
+.spacer-tile {
+  pointer-events: none;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  visibility: hidden;
+}
+.snake-arrow {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  left: unset;
+  font-size: 0.95em;
+  z-index: 10;
+  pointer-events: none;
+  color: #42ff6a;
+  text-shadow: 1px 1px 2px #000b;
+  line-height: 1;
+}
+.snake-arrow.left {
+  left: 4px;
+  right: unset;
+}
+  </style>
+</head>
+<body>
+  <div id="lobby">
+    <h2>OSRS Tile Race</h2>
+    <div class="err" id="lobby-error"></div>
+    <div class="info" id="lobby-info"></div>
+    <div id="lobby-step-main">
+  <button id="how-to-play-btn" style="margin-bottom:12px;">How to Play</button>
+  <button id="lobby-create-btn">Create Room</button>
+  <br>
+  <button id="lobby-join-btn">Join Room</button>
+  <button id="lobby-join-prev-btn">Join Previous Room</button>
+  <button id="lobby-spectate-btn">Spectate Game</button>
+</div>
+    <!-- CREATE ROOM FORM -->
+    <div id="lobby-step-create" class="hidden">
+      <div>
+        <label>Room code:<br>
+          <input id="lobby-roomcode-create" maxlength="8" style="text-transform:uppercase;" placeholder="e.g. OSRS42">
+        </label>
+      </div>
+      <div>
+        <label>Max players:<br>
+          <select id="lobby-playercount">
+            <option>2</option><option>3</option><option>4</option><option>5</option>
+            <option>6</option><option>7</option><option selected>8</option>
+          </select>
+        </label>
+      </div>
+      <div>
+        <label>Your name:<br>
+          <input id="lobby-myname-create" maxlength="16" placeholder="Your name">
+        </label>
+      </div>
+      <div>
+        <div>Pick your color:</div>
+        <div class="emoji-pick" id="lobby-color-create"></div>
+      </div>
+      <!-- Advanced Settings Toggle -->
+      <button type="button" id="toggle-advanced" style="margin-bottom:10px;">Show Advanced Settings ▼</button>
+      <!-- Advanced Settings (hidden by default) -->
+      <div id="lobby-advanced-settings" class="hidden" style="margin-top:10px; margin-bottom:10px; border:1px solid #333; border-radius:8px; padding:10px; background:#232323;">
+        <div>
+          <label>Max die roll (1–6):<br>
+            <select id="lobby-die-max">
+              <option value="6" selected>6</option>
+              <option value="5">5</option>
+              <option value="4">4</option>
+              <option value="3">3</option>
+              <option value="2">2</option>
+              <option value="1">1</option>
+            </select>
+          </label>
+        </div>
+        <div>
+          <label>
+            <input type="checkbox" id="lobby-second-die">
+            Add second die (roll 2 dice, 2–12)
+          </label>
+        </div>
+        <div>
+          <label>Board difficulty:<br>
+            <select id="lobby-difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+          </label>
+        </div>
+        <div>
+          <label>Tiles on board (20–100):<br>
+            <input id="lobby-tilecount" type="number" min="20" max="100" value="52">
+          </label>
+        </div>
+        <div>
+          <label>Special tiles (+3 and -3):<br>
+            <input id="lobby-specialcount" type="number" min="0" max="40" value="14">
+            <span style="font-size:0.9em;color:#bbb">(split equally between +3 and -3)</span>
+          </label>
+        </div>
+        <div id="tile-type-toggles-container" style="margin-top:10px;">
+  <label style="font-weight:bold; color:#ffe600;">Tile Types (Content):</label>
+  <div id="tile-type-toggles" style="margin-top:6px;margin-bottom:6px;">Loading...</div>
+  </div>
+      </div>
+      <button id="lobby-create-final-btn">Create & Join</button>
+      <br>
+      <button id="lobby-create-cancel-btn">Cancel</button>
+    </div>
+    <!-- JOIN ROOM FORM -->
+    <div id="lobby-step-join" class="hidden">
+      <div>
+        <label>Room code:<br>
+          <input id="lobby-roomcode-join" maxlength="8" style="text-transform:uppercase;" placeholder="e.g. OSRS42">
+        </label>
+      </div>
+      <div>
+        <label>Your name:<br>
+          <input id="lobby-myname-join" maxlength="16" placeholder="Your name">
+        </label>
+      </div>
+      <div>
+        <div>Pick your color:</div>
+        <div class="emoji-pick" id="lobby-color-join"></div>
+      </div>
+      <button id="lobby-join-final-btn">Join</button>
+      <br>
+      <button id="lobby-join-cancel-btn">Cancel</button>
+    </div>
+  </div>
+  <div class="main-center hidden" id="game-main">
+    <div id="room-info-bar">
+      <span>Room: <span class="room-code" id="room-info-code"></span></span>
+      <span class="player-list" id="room-info-players"></span>
+    </div>
+    <div class="controls">
+      <button id="roll-btn">Roll</button>
+      <div class="dice-group">
+        <div class="die-visual" id="die-visual" tabindex="0" aria-label="dice">
+          <div class="die-dot dot-center"></div>
+          <div class="die-dot dot-top"></div>
+          <div class="die-dot dot-bottom"></div>
+          <div class="die-dot dot-left"></div>
+          <div class="die-dot dot-right"></div>
+          <div class="die-dot dot-top-left"></div>
+          <div class="die-dot dot-bottom-right"></div>
+          <div class="die-dot dot-bottom-left"></div>
+          <div class="die-dot dot-top-right"></div>
+        </div>
+        <div class="die-visual" id="die-visual-2" tabindex="0" aria-label="dice" style="display:none;">
+          <div class="die-dot dot-center"></div>
+          <div class="die-dot dot-top"></div>
+          <div class="die-dot dot-bottom"></div>
+          <div class="die-dot dot-left"></div>
+          <div class="die-dot dot-right"></div>
+          <div class="die-dot dot-top-left"></div>
+          <div class="die-dot dot-bottom-right"></div>
+          <div class="die-dot dot-bottom-left"></div>
+          <div class="die-dot dot-top-right"></div>
+        </div>
+      </div>
+      <button id="undo-btn" title="Undo last roll">⟲</button>
+    </div>
+    <span class="die-result" id="die-result"></span>
+    <div id="board-outer">
+      <div id="board"></div>
+    </div>
+  </div>
+  <!-- ADMIN/UTILITY BUTTONS -->
+  <button class="admin-btn" id="sword-btn-float" title="Set team position">🫳️</button>
+  <button class="admin-btn" id="kick-btn-float" title="Kick a player">🥾</button>
+  <button class="admin-btn" id="log-btn-float" title="View Log">🪵</button>
+  <button class="admin-btn" id="verification-btn-float" title="Submit Verification">👓</button>
+  <button class="admin-btn" id="reset-btn-float" title="Reset game to start">🔄</button>
+  <button id="leave-room-btn" title="Leave Room">🚪</button>
+  <button class="admin-btn" id="coffee-btn-float" title="Buy me a coffee! ☕" onclick="window.open('https://coff.ee/birdandworm','_blank')">☕</button>
+  <div id="wait-overlay"></div>
+  <!-- How to Play Modal -->
+<div id="how-to-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#232323; padding:30px 24px 18px 24px; border-radius:14px; min-width:320px; max-width:96vw; box-shadow:0 0 24px #000b; text-align:left; position:relative;">
+    <button id="close-how-to-btn" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#fff; font-size:1.4em; cursor:pointer;">×</button>
+    <h3 style="margin-top:0; color:#ffe600; font-family:'Almendra', Georgia, serif;">How to Play</h3>
+    <ol style="color:#ffe9b1; font-size:1.09em;">
+      <li>Roll the dice to get started.</li>
+      <li>Your player will move to the tile you rolled.</li>
+      <li>Get the drop for the tile you landed on (<b>click the tile to flip it</b> for the drop descriptions).</li>
+      <li>Take a screenshot of your drop and paste the link to it in the verification button.</li>
+      <li>Roll again after you submit your screenshot.</li>
+      <li>
+        The <b>-3 hitsplat</b> tile will move you back 3 spaces if you land on it.<br>
+        The <b>+3 hp tile</b> will move you 3 additional spaces if you land on it.
+      </li>
+      <li>The first player to reach the finish tile wins!</li>
+    </ol>
+    <div style="margin-top:18px; color:#bce5ff; font-size:1.02em;">
+      <b>Buttons:</b>
+      <ul style="margin-top:7px; margin-bottom:0;">
+        <li><b>🫳</b> allows you to set your player piece on a specific tile in case of errors</li>
+        <li><b>🥾</b> allows you to kick a player from your room</li>
+        <li><b>🪵</b> shows a log of all tiles landed on by each player</li>
+        <li><b>👓</b> this button is for submitting your screenshots and viewing other screenshots</li>
+        <li><b>🔄</b> this button refreshes the room, loads a new board instance with a different tile layout and moves all players back to start</li>
+        <li><b>🚪</b> this button is to leave your room instance</li>
+      </ul>
+    </div>
+  </div>
+</div>
+  <!-- Verification Modal -->
+  <div id="verification-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#232323; padding:30px 24px 18px 24px; border-radius:14px; min-width:320px; max-width:96vw; box-shadow:0 0 24px #000b; text-align:center; position:relative;">
+      <button id="close-verification-btn" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#fff; font-size:1.4em; cursor:pointer;">×</button>
+      <h3 style="margin-top:0; color:#ffe600; font-family:'Almendra', Georgia, serif;">Submit Screenshot Link</h3>
+      <p style="font-size:1.04em; color:#eee;">Paste an image URL (e.g. imgur, gyazo, etc):</p>
+      <input id="verification-link-input" type="url" placeholder="https://imgur.com/..." style="width:95%; font-size:1.1em; margin-bottom:12px;" />
+      <br>
+      <button id="submit-verification-btn" style="margin-top:3px;">Submit</button>
+      <div id="verification-feedback" style="height:28px; color:#bce5ff; margin-top:10px;"></div>
+      <hr style="margin:18px 0 10px 0; border:none; border-top:1px solid #444;">
+      <div id="verification-links-list" style="text-align:left; max-height:240px; overflow-y:auto;"></div>
+    </div>
+  </div>
+  <div id="log-modal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#232323; padding:30px 24px 18px 24px; border-radius:14px; min-width:320px; max-width:96vw; box-shadow:0 0 24px #000b; text-align:left; position:relative;">
+      <button id="close-log-btn" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#fff; font-size:1.4em; cursor:pointer;">×</button>
+      <h3 style="margin-top:0; color:#ffe600; font-family:'Almendra', Georgia, serif;">Tile Landing Log</h3>
+      <div id="log-tiles-list" style="max-height:350px; overflow-y:auto; margin-top:16px;"></div>
+    </div>
+  </div>
+  <!-- FULL JS LOGIC -->
+  <script src="main.js"></script>
+</body>
+</html>
+  <script>
+// --- BEGIN JS LOGIC FOR MULTI-ROOM/PLAYER GAME ---
+const DEFAULT_EMOJIS = ["🔵", "🟡", "🟢", "🔴", "🟣", "🟠", "🟤", "⚫️"];
+const MAX_PLAYERS = 8;
+const GOBLIN_IMAGE = "https://oldschool.runescape.wiki/images/thumb/Goblin.png/800px-Goblin.png?3e49a";
+const HIT_SPLAT_IMAGE = "https://oldschool.runescape.wiki/images/Damage_hitsplat.png?1977a";
+const HEART_IMAGE = "https://oldschool.runescape.wiki/images/Hitpoints_icon_%28detail%29.png?a4903";
+const ZUK_IMAGE = "https://oldschool.runescape.wiki/images/thumb/TzKal-Zuk.png/800px-TzKal-Zuk.png?2d222";
+const ADMIN_PASSWORD = "SLEPEadmin";
+const SPREADSHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3YyF0bVu4hbr77ct9LRVKrMY5TFldnMv2i0vQasmBUYPrtDSDJyxVbpVWpW1wxO-oUoQoCamqTC8U/pub?output=csv";
+let currentRoom = null, currentPlayerId = null, currentPlayer = null, unsubscribeRoom = null, roomData = null;
+
+// --- Firebase ---
+const firebaseConfig = {
+  apiKey: "AIzaSyA3_XxZR9sKhTxRF3PbGkJthbcvlYBpkTI",
+  authDomain: "slepe-b10a1.firebaseapp.com",
+  projectId: "slepe-b10a1",
+  storageBucket: "slepe-b10a1.appspot.com",
+  messagingSenderId: "108058465654",
+  appId: "1:108058465654:web:c9142ed8fbd75108875657",
+  databaseURL: "https://slepe-b10a1-default-rtdb.firebaseio.com/"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+firebase.initializeApp(firebaseConfig);
+
+// --- App Check (App Auth) ---
+const appCheck = firebase.appCheck();
+appCheck.activate(
+  '6LepIXMrAAAAAAmOK4ppep7VYRAJFHxG6dY4YUJe',
+  true // automatic token refresh
+);
+// --- Verification Modal Logic ---
+document.getElementById('verification-btn-float').onclick = function() {
+  document.getElementById('verification-modal').style.display = 'flex';
+  document.getElementById('verification-link-input').value = '';
+  document.getElementById('verification-feedback').textContent = '';
+  loadVerificationLinks();
+};
+document.getElementById('close-verification-btn').onclick = function() {
+  document.getElementById('verification-modal').style.display = 'none';
+};
+document.getElementById('verification-modal').onclick = function(e) {
+  if (e.target === this) this.style.display = 'none';
+};
+document.getElementById('submit-verification-btn').onclick = async function() {
+  const link = document.getElementById('verification-link-input').value.trim();
+  const feedback = document.getElementById('verification-feedback');
+  if (!/^https?:\/\/\S+\.\S+/.test(link)) {
+    feedback.style.color = "#ff6666";
+    feedback.textContent = "Please enter a valid URL.";
+    return;
+  }
+  if (!window.currentRoom || !window.currentPlayerId) {
+    feedback.style.color = "#ff6666";
+    feedback.textContent = "Not in a room. Join or create a room first!";
+    return;
+  }
+  feedback.style.color = "#bce5ff";
+  feedback.textContent = "Submitting...";
+  const playerName = (window.currentPlayer && window.currentPlayer.name) ? window.currentPlayer.name : "Unknown";
+  const playerColor = (window.currentPlayer && window.currentPlayer.emoji) ? window.currentPlayer.emoji : "";
+  const entry = {
+    playerId: window.currentPlayerId,
+    playerName,
+    playerColor,
+    link,
+    submittedAt: Date.now()
+  };
+  try {
+    await firebase.database().ref("osrs-board/rooms/" + window.currentRoom + "/verifications").push(entry);
+    feedback.style.color = "#bce5ff";
+    feedback.textContent = "Screenshot link submitted!";
+    document.getElementById('verification-link-input').value = '';
+    loadVerificationLinks();
+  } catch (e) {
+    feedback.style.color = "#ff6666";
+    feedback.textContent = "Submission failed. Try again.";
+    console.error("Submission error:", e);
+  }
+};
+function loadVerificationLinks() {
+  if (!window.currentRoom) {
+    document.getElementById('verification-links-list').innerHTML = "<span style='color:#888;'>Not in a room.</span>";
+    return;
+  }
+  const listDiv = document.getElementById('verification-links-list');
+  listDiv.innerHTML = "<span style='color:#888;'>Loading…</span>";
+  firebase.database().ref("osrs-board/rooms/" + window.currentRoom + "/verifications")
+    .orderByChild('submittedAt').once('value').then(snap => {
+      let html = "";
+      let found = false;
+      snap.forEach(child => {
+        const v = child.val();
+        found = true;
+        const date = new Date(v.submittedAt).toLocaleString();
+        html += `<div style="margin-bottom:7px;">
+          <span style="font-size:1.18em;">${v.playerColor||""}</span>
+          <b>${v.playerName||""}</b>
+          <a href="${v.link}" target="_blank" style="color:#ffe600;word-break:break-all;">${v.link}</a>
+          <span style="color:#bbb; font-size:0.9em;">${date}</span>
+        </div>`;
+      });
+      listDiv.innerHTML = found ? html : "<span style='color:#888;'>No submissions yet.</span>";
+    });
+}
+
+// --- Advanced Settings Toggle ---
+document.getElementById("toggle-advanced").onclick = function() {
+  const adv = document.getElementById("lobby-advanced-settings");
+  if (adv.classList.contains("hidden")) {
+    adv.classList.remove("hidden");
+    this.textContent = "Hide Advanced Settings ▲";
+  } else {
+    adv.classList.add("hidden");
+    this.textContent = "Show Advanced Settings ▼";
+  }
+};
+
+// --- Tile Landing Log Modal Logic ---
+document.getElementById('log-btn-float').onclick = function() {
+  document.getElementById('log-modal').style.display = 'flex';
+  loadTileLandingLog();
+};
+document.getElementById('close-log-btn').onclick = function() {
+  document.getElementById('log-modal').style.display = 'none';
+};
+document.getElementById('log-modal').onclick = function(e) {
+  if (e.target === this) this.style.display = 'none';
+};
+// Replace your logTileLandingLog function with this improved version.
+// This version logs the actual tiles landed on, by comparing each history entry with the next,
+// and then includes the current positions as the most recent landings.
+
+// --- Helper: Room & player ID storage ---
+function saveSession(room, playerId) {
+  localStorage.setItem("osrs-room", room);
+  localStorage.setItem("osrs-playerId", playerId);
+  // also save last room always
+  localStorage.setItem("osrs-last-room", room);
+  localStorage.setItem("osrs-last-playerId", playerId);
+}
+function loadSession() {
+  return {
+    room: localStorage.getItem("osrs-room"),
+    playerId: localStorage.getItem("osrs-playerId")
+  };
+}
+function clearSession() {
+  localStorage.removeItem("osrs-room");
+  localStorage.removeItem("osrs-playerId");
+  // Don't remove osrs-last-room or osrs-last-playerId
+}
+
+// --- Lobby Logic ---
+function showDie(roll1, rolling, desc, roll2, fromTile, toTile) {
+  const die1 = document.getElementById('die-visual');
+  const die2 = document.getElementById('die-visual-2');
+  if (roll2 != null && roll2 !== undefined) {
+    die2.style.display = '';
+  } else {
+    die2.style.display = 'none';
+  }
+  function setDieDots(dieElem, value) {
+    for (let i = 1; i <= 6; ++i) {
+      dieElem.classList.remove('show-dot-' + i);
+    }
+    if (value >= 1 && value <= 6) {
+      dieElem.classList.add('show-dot-' + value);
+    }
+  }
+  setDieDots(die1, roll1);
+  if (roll2 != null && roll2 !== undefined) setDieDots(die2, roll2);
+  const dieResult = document.getElementById('die-result');
+  let resultStr = '';
+  if (roll2 != null && roll2 !== undefined) {
+    resultStr = rolling ?
+      `Rolling...` :
+      `Rolled: <b>${roll1}</b> + <b>${roll2}</b> = <b>${roll1 + roll2}</b>`;
+  } else {
+    resultStr = rolling ?
+      `Rolling...` :
+      `Rolled: <b>${roll1}</b>`;
+  }
+  if (!rolling && desc) {
+    resultStr += `<br><span style="font-size:0.84em;color:#ffe600">${desc}</span>`;
+  }
+  if (!rolling && fromTile !== undefined && toTile !== undefined && fromTile !== toTile) {
+    resultStr += `<br><span style="font-size:0.74em;color:#bce5ff">(${fromTile} → ${toTile})</span>`;
+  }
+  dieResult.innerHTML = resultStr;
+  dieResult.classList.toggle('rolling', rolling);
+}
+function showLobby(step = "main") {
+  document.getElementById("lobby").classList.remove("hidden");
+  document.getElementById("game-main").classList.add("hidden");
+  document.getElementById("leave-room-btn").style.display = "none";
+  ["main", "create", "join"].forEach(s =>
+    document.getElementById("lobby-step-" + s).classList.add("hidden")
+  );
+  document.getElementById("lobby-step-" + step).classList.remove("hidden");
+  document.getElementById("lobby-error").textContent = "";
+  document.getElementById("lobby-info").textContent = "";
+}
+function randCode(len = 6) {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < len; ++i) s += chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+// --- Emoji/color picker ---
+function renderEmojiPicker(parent, picked, unavailable, onPick) {
+  parent.innerHTML = "";
+  DEFAULT_EMOJIS.forEach(e => {
+    let span = document.createElement("span");
+    span.textContent = e;
+    span.className = (picked === e ? "picked " : "") + (unavailable.includes(e) ? "unavailable" : "");
+    if (!unavailable.includes(e)) span.onclick = () => onPick(e);
+    parent.appendChild(span);
+  });
+}
+
+// --- UI: Create Room ---
+let createPickedEmoji = null;
+document.getElementById("lobby-create-btn").onclick = () => {
+  showLobby("create");
+  document.getElementById("lobby-roomcode-create").value = randCode();
+  document.getElementById("lobby-playercount").value = "8";
+  document.getElementById("lobby-tilecount").value = "52";
+  document.getElementById("lobby-specialcount").value = "14";
+  document.getElementById("lobby-myname-create").value = "";
+  // Set the difficulty to default (medium)
+  const diff = document.getElementById("lobby-difficulty");
+  if (diff) diff.value = "medium";
+  createPickedEmoji = null;
+  renderEmojiPicker(
+    document.getElementById("lobby-color-create"),
+    null,
+    [],
+    emoji => {
+      createPickedEmoji = emoji;
+      renderEmojiPicker(document.getElementById("lobby-color-create"), emoji, [], () => {});
+    }
+  );
+  const togglesDiv = document.getElementById("tile-type-toggles");
+togglesDiv.innerHTML = "Loading types...";
+fetchTileTypesFromSheet().then(types => {
+  let html = "";
+  types.forEach(type => {
+  html += `<label class="tile-type-label">
+    <input type="checkbox" class="tile-type-checkbox" value="${type}" checked><span>${type}</span>
+  </label>`;
+});
+  togglesDiv.innerHTML = html;
+  document.getElementById("lobby-create-final-btn").disabled = false;
+}).catch(() => {
+  togglesDiv.innerHTML = "<span style='color:#ff4444;'>Failed to load tile types</span>";
+  document.getElementById("lobby-create-final-btn").disabled = false;
+});
+};
+document.getElementById("lobby-create-cancel-btn").onclick = () => showLobby("main");
+
+document.getElementById("lobby-tilecount").addEventListener("input", function() {
+  let tileCount = parseInt(this.value, 10) || 52;
+  let maxSpecial = Math.floor(tileCount / 2);
+  let specialInput = document.getElementById("lobby-specialcount");
+  specialInput.max = maxSpecial;
+  if (parseInt(specialInput.value, 10) > maxSpecial) {
+    specialInput.value = maxSpecial;
+  }
+});
+
+document.getElementById("lobby-create-final-btn").onclick = async () => {
+  let room = document.getElementById("lobby-roomcode-create").value.trim().toUpperCase();
+  let playerCount = parseInt(document.getElementById("lobby-playercount").value, 10) || 8;
+  let tileCount = parseInt(document.getElementById("lobby-tilecount").value, 10) || 52;
+  let specialCount = parseInt(document.getElementById("lobby-specialcount").value, 10);
+  if (isNaN(specialCount) || specialCount < 0) specialCount = 14;
+  specialCount = Math.min(Math.max(0, specialCount), Math.floor(tileCount/2));
+  let myname = document.getElementById("lobby-myname-create").value.trim();
+  let dieMax = parseInt(document.getElementById('lobby-die-max').value, 10) || 6;
+  let useSecondDie = document.getElementById('lobby-second-die').checked;
+  let difficulty = "medium";
+  const diffElem = document.getElementById("lobby-difficulty");
+  if (diffElem) difficulty = diffElem.value || "medium";
+  if (!/^[A-Z0-9]{3,8}$/.test(room)) return showLobbyError("Room code: 3-8 letters/numbers.");
+  if (!myname || myname.length < 2) return showLobbyError("Name: at least 2 characters.");
+  if (!createPickedEmoji) return showLobbyError("Pick a color.");
+  if (playerCount < 2 || playerCount > MAX_PLAYERS) return showLobbyError("Player count 2–" + MAX_PLAYERS + ".");
+  if (tileCount < 20 || tileCount > 100) return showLobbyError("Tile count must be 20–100.");
+  let allowedTypes = Array.from(document.querySelectorAll('.tile-type-checkbox'))
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+  if (!allowedTypes.length) {
+    document.getElementById("lobby-error").textContent = "You must select at least one tile type.";
+    return;
+  }
+  let roomRef = db.ref("osrs-board/rooms/" + room);
+  let snap = await roomRef.once("value");
+  if (snap.exists()) return showLobbyError("Room already exists.");
+  let playerId = "P" + Date.now() + Math.floor(Math.random()*10000);
+  let playerObj = { name: myname, emoji: createPickedEmoji, admin: true, online: true };
+  let players = { [playerId]: playerObj };
+  let roomObj = {
+    createdAt: Date.now(),
+    maxPlayers: playerCount,
+    tileCount: tileCount,
+    specialCount: specialCount,
+    dieMax: dieMax,
+    useSecondDie: useSecondDie,
+    players,
+    board: null,
+    game: null,
+    difficulty,
+    allowedTypes // <----- THIS IS REQUIRED
+  };
+  await roomRef.set(roomObj);
+  saveSession(room, playerId);
+  showLobbyInfo("Room created! Joining…");
+  location.reload();
+};
+// --- UI: Join Room ---
+let joinPickedEmoji = null;
+document.getElementById("lobby-join-btn").onclick = () => {
+  showLobby("join");
+  document.getElementById("lobby-roomcode-join").value = "";
+  document.getElementById("lobby-myname-join").value = "";
+  renderEmojiPicker(document.getElementById("lobby-color-join"), null, [], () => {});
+};
+document.getElementById("lobby-join-cancel-btn").onclick = () => showLobby("main");
+document.getElementById("lobby-color-join").onclick = e => {
+  if (e.target.tagName === "SPAN" && !e.target.classList.contains("unavailable")) {
+    joinPickedEmoji = e.target.textContent;
+    let unavailable = [];
+    let playerList = roomData && roomData.players ? Object.values(roomData.players) : [];
+    playerList.forEach(p => { if (p.emoji) unavailable.push(p.emoji); });
+    renderEmojiPicker(document.getElementById("lobby-color-join"), joinPickedEmoji, unavailable, () => {});
+  }
+};
+document.getElementById("lobby-roomcode-join").onblur = async function() {
+  let code = document.getElementById("lobby-roomcode-join").value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{3,8}$/.test(code)) return;
+  let roomRef = db.ref("osrs-board/rooms/" + code);
+  let snap = await roomRef.once("value");
+  if (!snap.exists()) {
+    showLobbyInfo("");
+    renderEmojiPicker(document.getElementById("lobby-color-join"), null, [], () => {});
+    roomData = null;
+    return;
+  }
+  roomData = snap.val();
+  let unavailable = [];
+  Object.values(roomData.players || {}).forEach(p => { if (p.emoji) unavailable.push(p.emoji); });
+  renderEmojiPicker(document.getElementById("lobby-color-join"), null, unavailable, () => {});
+  showLobbyInfo(`Players: ${Object.keys(roomData.players||{}).length}/${roomData.maxPlayers}`);
+};
+document.getElementById("lobby-join-final-btn").onclick = async () => {
+  let room = document.getElementById("lobby-roomcode-join").value.trim().toUpperCase();
+  let myname = document.getElementById("lobby-myname-join").value.trim();
+  if (!/^[A-Z0-9]{3,8}$/.test(room)) return showLobbyError("Room code: 3-8 letters/numbers.");
+  if (!myname || myname.length < 2) return showLobbyError("Name: at least 2 characters.");
+  if (!joinPickedEmoji) return showLobbyError("Pick a color.");
+  let roomRef = db.ref("osrs-board/rooms/" + room);
+  let snap = await roomRef.once("value");
+  if (!snap.exists()) return showLobbyError("Room does not exist.");
+  let data = snap.val();
+  if ((data.players && Object.keys(data.players).length >= data.maxPlayers)) return showLobbyError("Room full.");
+  let nameTaken = false, emojiTaken = false;
+  Object.values(data.players||{}).forEach(p => {
+    if (p.name && p.name.toLowerCase() === myname.toLowerCase()) nameTaken = true;
+    if (p.emoji === joinPickedEmoji) emojiTaken = true;
+  });
+  if (nameTaken) return showLobbyError("Name taken in this room.");
+  if (emojiTaken) return showLobbyError("Color taken in this room.");
+  let playerId = "P" + Date.now() + Math.floor(Math.random()*10000);
+  let playerObj = { name: myname, emoji: joinPickedEmoji, admin: false, online: true };
+  showLobbyInfo("Joining room…");
+  await roomRef.child("players").child(playerId).set(playerObj);
+  let appeared = false;
+  for (let tries = 0; tries < 50; ++tries) {
+    let check = await roomRef.child("players").child(playerId).once("value");
+    if (check.exists()) { appeared = true; break; }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  if (!appeared) {
+    showLobbyError("Failed to join room due to network delay. Try again.");
+    return;
+  }
+  saveSession(room, playerId);
+  location.reload();
+};
+document.getElementById("lobby-join-prev-btn").onclick = async function() {
+  const prevRoom = localStorage.getItem("osrs-last-room");
+  const prevPlayerId = localStorage.getItem("osrs-last-playerId");
+  if (!prevRoom) {
+    alert("No previous room found.");
+    return;
+  }
+  // Check if the room exists
+  const roomSnap = await firebase.database().ref("osrs-board/rooms/" + prevRoom).once("value");
+  if (!roomSnap.exists()) {
+    alert("Previous room is no longer available.");
+    localStorage.removeItem("osrs-last-room");
+    localStorage.removeItem("osrs-last-playerId");
+    return;
+  }
+  // Check if your old player ID is still in the room
+  const playerSnap = await firebase.database().ref("osrs-board/rooms/" + prevRoom + "/players/" + prevPlayerId).once("value");
+  if (playerSnap.exists()) {
+    // Resume as old player
+    saveSession(prevRoom, prevPlayerId);
+    location.reload();
+  } else {
+    // Prompt: rejoin as new player in that room
+    showLobby("join");
+    document.getElementById("lobby-roomcode-join").value = prevRoom;
+    document.getElementById("lobby-roomcode-join").dispatchEvent(new Event('blur'));
+    alert("Your previous player was removed from the room. Please rejoin as a new player.");
+  }
+};
+function showLobbyError(msg) {
+  document.getElementById("lobby-error").textContent = msg;
+  document.getElementById("lobby-info").textContent = "";
+}
+function showLobbyInfo(msg) {
+  document.getElementById("lobby-info").textContent = msg;
+  document.getElementById("lobby-error").textContent = "";
+}
+
+// --- Room/Game Logic ---
+// --- Room/Game Logic and Board Management ---
+
+async function joinRoom(room, playerId) {
+  currentRoom = room;
+  currentPlayerId = playerId;
+  window.currentRoom = room;
+  window.currentPlayerId = playerId;
+  if (unsubscribeRoom) unsubscribeRoom();
+  unsubscribeRoom = db.ref("osrs-board/rooms/" + room).on("value", snap => {
+    if (!snap.exists()) {
+      clearSession();
+      showLobby("main");
+      return;
+    }
+    let data = snap.val();
+    roomData = data;
+    window.roomData = data;
+    if (!data.players || !data.players[playerId]) {
+      clearSession();
+      showLobby("main");
+      return;
+    }
+    currentPlayer = data.players[playerId];
+    window.currentPlayer = currentPlayer;
+    renderGame();
+  });
+  document.getElementById("wait-overlay").style.opacity = "0";
+  document.getElementById("lobby").classList.add("hidden");
+  document.getElementById("game-main").classList.remove("hidden");
+  document.getElementById("leave-room-btn").style.display = "block";
+  document.body.scrollTop = document.documentElement.scrollTop = 0;
+}
+
+function renderGame() {
+  document.getElementById("room-info-code").textContent = currentRoom;
+  let playerBar = document.getElementById("room-info-players");
+  playerBar.innerHTML = "";
+  let players = roomData.players || {};
+  Object.entries(players).forEach(([pid, p]) => {
+    let chip = document.createElement("span");
+    chip.className = "player-chip" +
+      (p.admin ? " admin" : "") +
+      (pid === currentPlayerId ? " me" : "");
+    chip.innerHTML = `<span class="emoji">${p.emoji}</span> ${escapeHtml(p.name)}`;
+    playerBar.appendChild(chip);
+  });
+  if (!roomData.board) {
+    initializeRoomBoard();
+    return;
+  }
+  renderBoard(roomData.board, roomData.game.positions);
+  document.getElementById("leave-room-btn").style.display = "block";
+  
+  // Only show kick button for admin
+  const kickBtn = document.getElementById("kick-btn-float");
+  if (currentPlayer && currentPlayer.admin) {
+    kickBtn.style.display = "flex";
+  } else {
+    kickBtn.style.display = "none";
+  }
+}
+// --- Board Generation ---
+async function fetchTileTypesFromSheet() {
+  const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ3YyF0bVu4hbr77ct9LRVKrMY5TFldnMv2i0vQasmBUYPrtDSDJyxVbpVWpW1wxO-oUoQoCamqTC8U/pub?output=csv";
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error("Failed to fetch sheet: " + resp.status);
+  const text = await resp.text();
+  const lines = text.trim().split(/\r?\n/);
+  if (!lines.length) return [];
+  let types = new Set();
+  lines.slice(1).forEach(line => {
+    // robustly grab only column E (the 5th column), handling quoted CSV
+    // This regex matches 5 fields (quoted or not), grabbing the 5th
+    const match = line.match(/^(?:"[^"]*"|[^,]*),(?:"[^"]*"|[^,]*),(?:"[^"]*"|[^,]*),(?:"[^"]*"|[^,]*),(?:"([^"]*)"|([^,]*))/);
+    if (match) {
+      const typeVal = (match[1] || match[2] || "").trim();
+      if (typeVal) types.add(typeVal);
+    }
+  });
+  return Array.from(types).filter(Boolean).sort();
+}
+async function fetchItemListFromSheet() {
+  const resp = await fetch(SPREADSHEET_URL);
+  if (!resp.ok) throw new Error("Failed to fetch sheet: " + resp.status);
+  const text = await resp.text();
+  return parseCsvFiveColumns(text); // <-- Must use the correct parser!
+}
+function parseCsvFiveColumns(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (!lines.length) return [];
+  return lines.slice(1).map(l => {
+    // Regex to match five fields, including quoted values with commas
+    const match = l.match(/^(?:"([^"]*)"|([^,]*)),(?:"([^"]*)"|([^,]*)),(?:"([^"]*)"|([^,]*)),(?:"([^"]*)"|([^,]*)),(?:"([^"]*)"|([^,]*))/);
+    if (match) {
+      return {
+        item: (match[1] || match[2] || "").trim(),
+        image: (match[3] || match[4] || "").trim(),
+        desc: (match[5] || match[6] || "").trim(),
+        difficulty: ((match[7] || match[8] || "medium").trim().toLowerCase() || "medium"),
+        type: (match[9] || match[10] || "").trim() // <-- Only column E!
+      };
+    }
+    // fallback: naive split
+    const cols = l.split(",");
+    return {
+      item: (cols[0] || "").trim(),
+      image: (cols[1] || "").trim(),
+      desc: (cols[2] || "").trim(),
+      difficulty: (cols[3] || "medium").trim().toLowerCase(),
+      type: (cols[4] || "").trim()
+    };
+  }).filter(row => row.item);
+}
+
+// And in your board setup:
+async function initializeRoomBoard() {
+  const itemList = await fetchItemListFromSheet();
+  const uniqueTypes = Array.from(new Set(itemList.map(row => row.type)));
+  console.log("All unique types in itemList:", uniqueTypes);
+  const difficulty = roomData.difficulty || "medium";
+  let allowedDifficulties;
+  if (difficulty === "easy") {
+    allowedDifficulties = ["easy"];
+  } else if (difficulty === "medium") {
+    allowedDifficulties = ["easy", "medium"];
+  } else {
+    allowedDifficulties = ["easy", "medium", "hard"];
+  }
+  let allowedTypes = (roomData.allowedTypes && roomData.allowedTypes.length) ? roomData.allowedTypes : null;
+  let filteredItems = itemList.filter(row =>
+    allowedDifficulties.includes(row.difficulty) &&
+    (!allowedTypes || allowedTypes.includes(row.type || ""))
+  );
+  console.log('filteredItems:', filteredItems, 'allowedTypes:', allowedTypes, 'itemList:', itemList);
+  if (!filteredItems.length) {
+    alert(
+      "No board items match your selected tile types and difficulty.\n" +
+      "Check your tile type selection or spreadsheet data."
+    );
+    // Optionally: fallback to all items, or return;
+    // return;
+  }
+  const tileCount = roomData.tileCount || 52;
+  const specialCount = roomData.specialCount ?? 14;
+  const board = generateBoardWithItems(filteredItems.length ? filteredItems : itemList, tileCount, specialCount);
+  const numPlayers = roomData.maxPlayers;
+  const positions = Array(numPlayers).fill(0);
+  const winners = Array(numPlayers).fill(false);
+  const skips = Array(numPlayers).fill(3);
+  const game = {
+    positions,
+    winners,
+    gameOver: false,
+    skips,
+    history: [],
+    currentTeam: 0
+  };
+  await db.ref("osrs-board/rooms/" + currentRoom).update({ board, game });
+}
+function shuffleArray(array) {
+  let arr = array.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function pickSpacedSpecialIndices(tileCount, skipCount, fallCount, minDist) {
+  // Exclude tiles that are within 3 spaces of the start (1,2,3) or end (tileCount-3, tileCount-2, tileCount-1)
+  let possible = [];
+  for (let i = 4; i <= tileCount - 4; ++i) possible.push(i);
+  let attempts = 0, maxAttempts = 10000;
+  let total = skipCount + fallCount;
+  while (attempts < maxAttempts) {
+    let indices = shuffleArray(possible);
+    let chosen = [];
+    for (let idx of indices) {
+      if (chosen.every(j => Math.abs(j - idx) >= minDist)) {
+        chosen.push(idx);
+        if (chosen.length === total) break;
+      }
+    }
+    if (chosen.length === total) {
+      let shuf = shuffleArray(chosen);
+      let skipIdxs = shuf.slice(0, skipCount);
+      let fallIdxs = shuf.slice(skipCount, skipCount + fallCount);
+      return [skipIdxs, fallIdxs];
+    }
+    attempts++;
+  }
+  // fallback: greedy placement if can't satisfy spacing
+  let chosen = [];
+  for (let idx of possible) {
+    if (chosen.every(j => Math.abs(j - idx) >= minDist)) {
+      chosen.push(idx);
+      if (chosen.length === total) break;
+    }
+  }
+  let shuf = shuffleArray(chosen);
+  let skipIdxs = shuf.slice(0, skipCount);
+  let fallIdxs = shuf.slice(skipCount, skipCount + fallCount);
+  return [skipIdxs, fallIdxs];
+}
+function buildBoardWithFewestDuplicates(itemList, totalTiles) {
+  if (itemList.length === 0) return [];
+  const pool = itemList.slice();
+  const minCount = Math.floor(totalTiles / pool.length);
+  const extra = totalTiles % pool.length;
+
+  let itemCounts = {};
+  pool.forEach(it => itemCounts[it.item] = minCount);
+  shuffleArray(pool).slice(0, extra).forEach(it => itemCounts[it.item]++);
+
+  let expanded = [];
+  Object.entries(itemCounts).forEach(([item, count]) => {
+    const tileObj = pool.find(it => it.item === item);
+    for (let i = 0; i < count; ++i) expanded.push(tileObj);
+  });
+
+  // Try to avoid adjacents
+  for (let tries = 0; tries < 2000; ++tries) {
+    let shuffled = shuffleArray(expanded);
+    let valid = true;
+    for (let i = 1; i < shuffled.length; ++i) {
+      if (shuffled[i].item === shuffled[i-1].item) {
+        valid = false;
+        break;
+      }
+    }
+    if (valid) return shuffled;
+  }
+  return shuffleArray(expanded);
+}
+function generateBoardWithItems(itemList, tileCount, specialCount = 14) {
+  let tiles = [];
+  let normalTiles = tileCount;
+  let tileItems = buildBoardWithFewestDuplicates(itemList, normalTiles);
+  let effectTiles = Array(normalTiles).fill(null);
+  specialCount = Math.min(Math.max(0, specialCount), Math.floor(normalTiles/2));
+  let skipCount = Math.ceil(specialCount / 2);
+  let fallCount = Math.floor(specialCount / 2);
+  let [skipIdxs, fallIdxs] = pickSpacedSpecialIndices(normalTiles, skipCount, fallCount, 4);
+  for (let i of skipIdxs) effectTiles[i] = "skip-ahead";
+  for (let i of fallIdxs) effectTiles[i] = "fall-back";
+  tiles.push({index: 0, type: "start"});
+  for (let i = 1; i <= normalTiles; ++i) {
+    tiles.push({
+      index: i,
+      type: "normal",
+      item: tileItems[i-1].item,
+      image: tileItems[i-1].image,
+      desc: tileItems[i-1].desc,
+      effect: effectTiles[i-1]
+    });
+  }
+  tiles.push({index: tileCount+1, type: "finish"});
+  return tiles;
+}
+function snakingIndexes(len, cols) {
+  let idxs = [];
+  let rows = Math.ceil(len / cols);
+  for (let r = 0; r < rows; ++r) {
+    let row = [];
+    for (let c = 0; c < cols; ++c) {
+      let idx = r * cols + c;
+      if (idx < len) row.push(idx);
+    }
+    if (r % 2 === 1) row.reverse();
+    idxs = idxs.concat(row);
+  }
+  return idxs;
+}
+function setTileSizes() {
+  const board = document.getElementById('board');
+  let tiles = roomData && roomData.board ? roomData.board : [];
+  let tileCount = tiles.length || 52;
+  let cols = 10;
+  if (window.innerWidth < 1200) cols = 8;
+  if (window.innerWidth < 900) cols = 6;
+  if (window.innerWidth < 700) cols = 4;
+  let rows = Math.ceil(tileCount / cols);
+  board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  board.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+}
+function renderBoard(tiles, positions) {
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  let cols = 10;
+  if (window.innerWidth < 1200) cols = 8;
+  if (window.innerWidth < 900) cols = 6;
+  if (window.innerWidth < 700) cols = 4;
+
+  const totalTiles = tiles.length;
+  const rows = Math.ceil(totalTiles / cols);
+
+  let grid = [];
+  let tileIdx = 0;
+  for (let r = 0; r < rows; ++r) {
+    grid[r] = [];
+    for (let c = 0; c < cols; ++c) {
+      if (tileIdx < totalTiles) {
+        grid[r].push(tiles[tileIdx]);
+        tileIdx++;
+      } else {
+        grid[r].push(null);
+      }
+    }
+    if (r % 2 === 1) grid[r].reverse();
+  }
+
+  // Prepare player list once
+  let playerList = Object.values(roomData.players || {});
+
+  for (let r = 0; r < rows; ++r) {
+    for (let c = 0; c < cols; ++c) {
+      const tile = grid[r][c];
+      if (!tile) {
+        const spacer = document.createElement('div');
+        spacer.className = 'tile spacer-tile';
+        board.appendChild(spacer);
+        continue;
+      }
+
+      // --- TILE RENDERING LOGIC ---
+      let isFlippable = tile.type === "normal" && !tile.effect;
+      let key = `tile-${tile.index}`;
+      let flipped = !!(window._tileFlipStates && window._tileFlipStates[key]);
+
+      let tileDiv = document.createElement('div');
+      tileDiv.className = 'tile' +
+        (tile.type==="start"?" start":"") +
+        (tile.type==="finish"?" finish":"") +
+        (tile.effect==="skip-ahead"?" skip-ahead":"") +
+        (tile.effect==="fall-back"?" fall-back":"") +
+        (isFlippable ? ' tile-flip' : '') +
+        (flipped ? ' tile-flipped' : '');
+
+      if (isFlippable) {
+        tileDiv.innerHTML = `
+          <div class="tile-inner">
+            <div class="tile-front">
+              <span class="tile-index">${tile.index}</span>
+              <div class="tile-content">
+                ${tile.image ? `<img src="${tile.image}" class="tile-icon" alt="">` : ''}
+                <span class="tile-item">${tile.item}</span>
+              </div>
+            </div>
+            <div class="tile-back" style="overflow-y:auto;word-break:break-word;white-space:pre-line;max-width:100%;max-height:100%;box-sizing:border-box;">
+              ${tile.desc ? escapeHtml(tile.desc) : '<span style="color:#aaa">No description</span>'}
+            </div>
+          </div>
+        `;
+        tileDiv.onclick = function() {
+          window._tileFlipStates = window._tileFlipStates || {};
+          window._tileFlipStates[key] = !window._tileFlipStates[key];
+          renderBoard(tiles, positions);
+        };
+      } else if (tile.type === "start") {
+        tileDiv.innerHTML += `<img src="${GOBLIN_IMAGE}" class="tile-bg" alt="Goblin">`;
+        tileDiv.innerHTML += `<span class="tile-label">START</span>`;
+      } else if (tile.type === "finish") {
+        tileDiv.innerHTML += `<img src="${ZUK_IMAGE}" class="tile-bg" alt="Zuk">`;
+        tileDiv.innerHTML += `<span class="tile-label">FINISH</span>`;
+      } else if (tile.effect === "skip-ahead") {
+        tileDiv.innerHTML += `<img src="${HEART_IMAGE}" class="tile-bg" alt="Heart">`;
+        tileDiv.innerHTML += `<span class="tile-index">${tile.index}</span>`;
+        tileDiv.innerHTML += `<span class="tile-effect-center">+3</span>`;
+      } else if (tile.effect === "fall-back") {
+        tileDiv.innerHTML += `<img src="${HIT_SPLAT_IMAGE}" class="tile-bg" alt="Hitsplat">`;
+        tileDiv.innerHTML += `<span class="tile-index">${tile.index}</span>`;
+        tileDiv.innerHTML += `<span class="tile-effect-center">-3</span>`;
+      } else {
+        tileDiv.innerHTML += `<span class="tile-index">${tile.index}</span>`;
+        tileDiv.innerHTML += `<div class="tile-content">`;
+        if (tile.image) {
+          tileDiv.innerHTML += `<img src="${tile.image}" class="tile-icon" alt="">`;
+        }
+        tileDiv.innerHTML += `<span class="tile-item">${tile.item}</span>`;
+        tileDiv.innerHTML += `</div>`;
+      }
+
+      // --- ARROW LOGIC ---
+      if (
+        r < rows - 1 &&
+        (
+          (r % 2 === 0 && c === cols - 1 && tile) // LTR row right end
+          || (r % 2 === 1 && c === 0 && tile)     // RTL row left end
+        )
+      ) {
+        let arrowSpan = document.createElement('span');
+        arrowSpan.className = 'snake-arrow' + (r % 2 === 1 ? ' left' : '');
+       arrowSpan.innerHTML = `<svg width="18" height="18" style="vertical-align:middle" viewBox="0 0 20 20"><path d="M10 2v12M10 14l-6-6M10 14l6-6" stroke="#42ff6a" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        tileDiv.style.position = 'relative';
+        tileDiv.appendChild(arrowSpan);
+      }
+
+      // --- PLAYER PIECES ---
+      let teamsOnThisTile = [];
+      for(let t=0; t<positions.length; ++t) {
+        if (positions[t] === tile.index && playerList[t]) teamsOnThisTile.push(playerList[t]);
+      }
+      if (teamsOnThisTile.length > 0 && !flipped) {
+        let piecesHTML = teamsOnThisTile.map(p =>
+          `<span class="tile-piece" title="${escapeHtml(p.name)}">${p.emoji}</span>`
+        ).join('');
+        let sharedClass = teamsOnThisTile.length > 1 ? "tile-pieces shared" : "tile-pieces";
+        tileDiv.innerHTML += `<span class="${sharedClass}">${piecesHTML}</span>`;
+      }
+
+      board.appendChild(tileDiv);
+    }
+  }
+  setTileSizes();
+}
+// --- Game Actions ---
+function getTileDescription(tile) {
+  if (!tile) return "";
+  if (tile.type === "start") return "Start";
+  if (tile.type === "finish") return "Finish";
+  if (tile.effect === "skip-ahead") return "Skip ahead (+3)";
+  if (tile.effect === "fall-back") return "Fall back (-3)";
+  if (tile.item) return tile.item;
+  return "";
+}
+
+document.getElementById('roll-btn').onclick = async function() {
+  if (!roomData || !roomData.board || !roomData.game) return;
+  const myIdx = Object.keys(roomData.players || {}).findIndex(pid => pid === currentPlayerId);
+  if (myIdx === -1) {
+    alert("You are not in this room.");
+    return;
+  }
+  if (!confirm("Confirm you've submitted your screenshot and are ready to roll your piece.")) {
+    return;
+  }
+  const dieMax = roomData.dieMax || 6;
+  const useSecondDie = !!roomData.useSecondDie;
+  const roll1 = Math.floor(Math.random() * dieMax) + 1;
+  const roll2 = useSecondDie ? Math.floor(Math.random() * dieMax) + 1 : null;
+  const finalRoll = useSecondDie ? roll1 + roll2 : roll1;
+  const startTile = roomData.game.positions[myIdx];
+  let endTile = Math.max(0, Math.min(startTile + finalRoll, roomData.board.length - 1));
+  let landedTile = roomData.board[endTile];
+  if (landedTile && landedTile.effect === "skip-ahead") {
+    endTile = Math.max(0, Math.min(endTile + 3, roomData.board.length - 1));
+  }
+  if (landedTile && landedTile.effect === "fall-back") {
+    endTile = Math.max(0, Math.min(endTile - 3, roomData.board.length - 1));
+  }
+  let animPositions = roomData.game.positions.slice();
+  let currentTile = startTile;
+  const step = endTile > startTile ? 1 : -1;
+  let frame = 0;
+  const totalFrames = Math.abs(endTile - startTile) + 6;
+  function animateStep() {
+    let showR1, showR2;
+    if (frame < totalFrames - 1) {
+      showR1 = Math.floor(Math.random() * dieMax) + 1;
+      showR2 = useSecondDie ? Math.floor(Math.random() * dieMax) + 1 : null;
+      showDie(showR1, true, "Rolling...", showR2);
+    } else {
+      let tileDesc = getTileDescription(roomData.board[endTile]);
+      showDie(roll1, false, tileDesc, roll2, startTile, endTile);
+    }
+    frame++;
+    if (frame < totalFrames) {
+      setTimeout(animateStep, 120);
+    } else {
+      // Animate the piece moving tile by tile
+      animatePieceMove(startTile, endTile, animPositions.slice(), function() {
+        // AFTER movement, update Firebase as before:
+        db.ref("osrs-board/rooms/" + currentRoom + "/game").transaction(game => {
+          if (!game || game.gameOver) return game;
+          let positions = game.positions.slice();
+          let winners = (game.winners || []).slice();
+          let skips = (game.skips || []).slice();
+          positions[myIdx] = endTile;
+          let gameOver = false;
+          if (endTile === roomData.board.length - 1) {
+            winners[myIdx] = true;
+            gameOver = true;
+          }
+          let currentTeam = game.currentTeam || 0;
+          let history = (game.history || []).concat([{
+  // Save the state *before* the move
+  positions: game.positions.slice(),
+  winners: (game.winners || []).slice(),
+  skips: (game.skips || []).slice(),
+  gameOver: game.gameOver,
+  currentTeam: game.currentTeam
+}]);
+return {...game, positions, winners, skips, gameOver, currentTeam, history};
+        });
+      });
+    }
+  }
+  animateStep();
+document.getElementById('undo-btn').onclick = function() {
+  db.ref("osrs-board/rooms/" + currentRoom + "/game").transaction(game => {
+    if (!game || !game.history || game.history.length === 0) return game;
+    let prev = game.history[game.history.length - 1];
+
+    // Find the player index and their current tile before undo
+    let playerIdx = Object.keys(roomData.players || {}).findIndex(pid => pid === currentPlayerId);
+    let tileBeforeUndo = (game.positions && playerIdx !== -1) ? game.positions[playerIdx] : null;
+
+    let undos = (game.undos || []).concat([{
+      undoBy: currentPlayer ? currentPlayer.name : "Unknown",
+      undoAt: Date.now(),
+      tile: tileBeforeUndo
+    }]);
+    return {
+      ...game,
+      positions: prev.positions,
+      winners: prev.winners || Array((game.positions || []).length).fill(false),
+      skips: prev.skips || Array((game.positions || []).length).fill(3),
+      gameOver: prev.gameOver || false,
+      currentTeam: prev.currentTeam || 0,
+      history: game.history.slice(0, -1),
+      undos
+    };
+  });
+};
+  // Helper function for animating the piece
+  function animatePieceMove(from, to, positions, callback) {
+    const step = from < to ? 1 : -1;
+    let current = from;
+    function moveOne() {
+      if (current === to) {
+        callback && callback();
+        return;
+      }
+      current += step;
+      positions[myIdx] = current;
+      renderBoard(roomData.board, positions.slice());
+      setTimeout(moveOne, 240); // adjust speed as desired
+    }
+    moveOne();
+  }
+};
+function loadTileLandingLog() {
+  const logDiv = document.getElementById('log-tiles-list');
+  logDiv.innerHTML = "<span style='color:#888;'>Loading…</span>";
+  if (!window.currentRoom || !window.roomData || !window.roomData.game) {
+    logDiv.innerHTML = "<span style='color:#888;'>Game data not available.</span>";
+    return;
+  }
+  const players = window.roomData.players || {};
+  const board = window.roomData.board || [];
+  const game = window.roomData.game || {};
+  const history = (game.history || []);
+  const currentPositions = game.positions || [];
+  const undos = game.undos || [];
+
+  // Build landing logs: for each player, keep a list of landed tiles.
+  let playerLands = {};
+  Object.keys(players).forEach(pid => playerLands[pid] = []);
+
+  // Get array of player IDs in consistent order
+  const playerIds = Object.keys(players);
+
+  // Step 1: Use history to reconstruct landings
+  for (let i = 1; i < history.length; ++i) {
+    const prev = history[i - 1].positions || [];
+    const curr = history[i].positions || [];
+    for (let j = 0; j < curr.length; ++j) {
+      if (curr[j] !== prev[j]) {
+        const pid = playerIds[j];
+        if (pid !== undefined && curr[j] !== undefined) playerLands[pid].push(curr[j]);
+      }
+    }
+  }
+  // Step 2: Add landings for the latest move (current game state vs last history)
+  let prev = history.length ? history[history.length - 1].positions : Array(currentPositions.length).fill(0);
+  for (let j = 0; j < currentPositions.length; ++j) {
+    if (currentPositions[j] !== prev[j]) {
+      const pid = playerIds[j];
+      if (pid !== undefined && currentPositions[j] !== undefined) playerLands[pid].push(currentPositions[j]);
+    }
+  }
+
+  let html = "";
+  Object.entries(players).forEach(([pid, p]) => {
+    html += `<div style="margin-bottom:13px;">
+      <span style="font-size:1.18em;">${p.emoji||""}</span>
+      <b>${p.name||""}</b><br>
+      <span style="color:#ffe600;">Tiles:</span>
+      <ol style="margin:6px 0 0 18px; color:#bce5ff; font-size:1em;">`;
+    playerLands[pid].forEach(tileIdx => {
+      const tileObj = board[tileIdx] || {};
+      let label = tileObj.type === "start" ? "Start"
+               : tileObj.type === "finish" ? "Finish"
+               : tileObj.item ? `${tileObj.item} (${tileIdx})`
+               : `Tile ${tileIdx}`;
+      html += `<li>${label}</li>`;
+    });
+    html += `</ol></div>`;
+  });
+
+  // --- Patch: Show set actions ---
+  let setActions = [];
+  history.forEach(h => {
+    if (h.setAction) setActions.push(h);
+  });
+  if (setActions.length > 0) {
+    html += `<div style="margin-top:18px;margin-bottom:6px;color:#ffe600;"><b>Set actions:</b></div>`;
+    setActions.forEach(action => {
+      let dt = action.setAt ? new Date(action.setAt).toLocaleString() : '';
+      html += `<div style="color:#bce5ff;font-size:1em;margin-left:12px;">
+        <b>Set button used</b> by <b>${escapeHtml(action.setBy || "Unknown")}</b>${action.setTarget ? ` for <b>${escapeHtml(action.setTarget)}</b>` : ""} to tile <b>${typeof action.setPosition === 'number' ? action.setPosition : '?'}</b>${dt ? ` at ${dt}` : ''}
+      </div>`;
+    });
+  }
+
+  // --- Patch: Show undos ---
+  if (undos.length > 0) {
+    html += `<div style="margin-top:18px;margin-bottom:6px;color:#ffe600;"><b>Undo actions:</b></div>`;
+    undos.forEach(action => {
+      let dt = action.undoAt ? new Date(action.undoAt).toLocaleString() : '';
+      let tileInfo = (typeof action.tile === 'number') ? ` on tile <b>${action.tile}</b>` : '';
+      html += `<div style="color:#bce5ff;font-size:1em;margin-left:12px;">Undo by <b>${escapeHtml(action.undoBy)}</b>${tileInfo} at ${dt}</div>`;
+    });
+  }
+  logDiv.innerHTML = html || "<span style='color:#888;'>No moves yet.</span>";
+}
+
+document.getElementById('reset-btn-float').onclick = function() {
+  if (confirm("Reset the board? (This cannot be undone and will randomize a new board)")) {
+    initializeRoomBoard();
+  }
+};
+document.getElementById('kick-btn-float').onclick = async function() {
+  // Only allow admin to kick
+  if (!currentPlayer || !currentPlayer.admin) {
+    alert("Only the room creator (host) can kick players.");
+    return;
+  }
+  if (!roomData || !roomData.players) return;
+  // ... rest of your kick logic ...
+};
+document.getElementById('sword-btn-float').onclick = function() {
+  let playerList = Object.values(roomData.players || {});
+  let pick = prompt("Set position for which player? Enter name or emoji.");
+  if (!pick) return;
+  let idx = playerList.findIndex(p =>
+    p.name.toLowerCase() === pick.toLowerCase() ||
+    (p.emoji && p.emoji === pick)
+  );
+  if (idx === -1) return alert("No such player.");
+  let pos = prompt("Set to which tile index? (0-" + (roomData.board.length - 1) + ")", "0");
+  let idxTile = parseInt(pos, 10);
+  if (isNaN(idxTile) || idxTile < 0 || idxTile > roomData.board.length - 1) return alert("Invalid position.");
+  db.ref("osrs-board/rooms/" + currentRoom + "/game").transaction(game => {
+    if (!game || !game.positions) return game;
+    let positions = (game.positions || []).slice();
+    let winners = (game.winners || []).slice();
+    let skips = (game.skips || []).slice();
+    positions[idx] = idxTile;
+    let gameOver = !!(game.winners && game.winners[idx]);
+    let currentTeam = game.currentTeam || 0;
+   let history = (game.history || []).concat([{
+  positions: positions.slice(),
+  winners: winners.slice(),
+  skips: skips.slice(),
+  gameOver,
+  currentTeam,
+  setBy: currentPlayer && currentPlayer.name ? currentPlayer.name : "Unknown",
+  setTarget: playerList[idx] ? playerList[idx].name : "",
+  setPosition: idxTile,
+  setAction: true,
+  setAt: Date.now() // <-- ADD THIS LINE
+}]);
+    return {...game, positions, winners, skips, gameOver, currentTeam, history};
+  });
+};
+
+document.getElementById('kick-btn-float').onclick = async function() {
+  if (!roomData || !roomData.players) return;
+  const playerList = Object.entries(roomData.players);
+  const myId = currentPlayerId;
+  const kickable = playerList.filter(([pid]) => pid !== myId);
+  if (kickable.length === 0) {
+    alert("No other players to kick.");
+    return;
+  }
+  let promptStr = "Kick which player?\n";
+  for (let i = 0; i < kickable.length; ++i) {
+    const [pid, p] = kickable[i];
+    promptStr += `${i + 1}: ${p.name} (${p.emoji})\n`;
+  }
+  promptStr += "Enter the number, name, or emoji:";
+  let choice = prompt(promptStr);
+  if (!choice) return;
+  let idx = parseInt(choice, 10) - 1;
+  let kickId, kickPlayer;
+  if (!isNaN(idx) && idx >= 0 && idx < kickable.length) {
+    [kickId, kickPlayer] = kickable[idx];
+  } else {
+    [kickId, kickPlayer] = kickable.find(
+      ([pid, p]) =>
+        p.name.trim().toLowerCase() === choice.trim().toLowerCase() ||
+        (p.emoji && p.emoji === choice.trim())
+    ) || [];
+    if (!kickId) {
+      alert("Invalid selection.");
+      return;
+    }
+  }
+  if (!confirm(`Kick ${kickPlayer.name} (${kickPlayer.emoji})?`)) return;
+  await db.ref("osrs-board/rooms/" + currentRoom + "/players/" + kickId).remove();
+  const roomSnap = await db.ref("osrs-board/rooms/" + currentRoom + "/players").once("value");
+  if (!roomSnap.exists()) {
+    await db.ref("osrs-board/rooms/" + currentRoom).remove();
+  }
+};
+
+document.getElementById('leave-room-btn').onclick = async function() {
+  if (!currentRoom || !currentPlayerId) {
+    showLobby("main");
+    clearSession();
+    return;
+  }
+  if (!confirm("Are you sure you want to leave the room? You may not be able to rejoin.")) {
+    return;
+  }
+  await db.ref("osrs-board/rooms/" + currentRoom + "/players/" + currentPlayerId).remove();
+  const roomSnap = await db.ref("osrs-board/rooms/" + currentRoom + "/players").once("value");
+  if (!roomSnap.exists()) {
+    await db.ref("osrs-board/rooms/" + currentRoom).remove();
+  }
+  clearSession();
+  showLobby("main");
+  currentRoom = null;
+  currentPlayerId = null;
+  currentPlayer = null;
+  roomData = null;
+};
+
+function escapeHtml(s) {
+  return s.replace(/[<>&"']/g, c =>
+    c === "<" ? "&lt;" :
+    c === ">" ? "&gt;" :
+    c === "&" ? "&amp;" :
+    c === '"' ? "&quot;" : "&#39;"
+  );
+}
+
+window.onload = function() {
+  let sess = loadSession();
+  if (sess.room && sess.playerId) {
+    joinRoom(sess.room, sess.playerId);
+  } else {
+    showLobby("main");
+  }
+};
+window.onresize = setTileSizes;
+// How to Play Modal Logic
+document.getElementById('how-to-play-btn').onclick = function() {
+  document.getElementById('how-to-modal').style.display = 'flex';
+};
+document.getElementById('close-how-to-btn').onclick = function() {
+  document.getElementById('how-to-modal').style.display = 'none';
+};
+document.getElementById('how-to-modal').onclick = function(e) {
+  if (e.target === this) this.style.display = 'none';
+};
+// --- Spectate Game Logic ---
+document.getElementById('lobby-spectate-btn').onclick = async function() {
+  const code = prompt("Enter room code to spectate:").trim().toUpperCase();
+  if (!/^[A-Z0-9]{3,8}$/.test(code)) {
+    alert("Invalid room code. It must be 3-8 letters/numbers.");
+    return;
+  }
+  // Check room existence
+  const roomSnap = await firebase.database().ref("osrs-board/rooms/" + code).once("value");
+  if (!roomSnap.exists()) {
+    alert("No such room.");
+    return;
+  }
+  // Set flags so rest of app knows this is a spectator
+  window.isSpectator = true;
+  window.spectateRoom = code;
+  // Hide lobby, show game board as spectator
+  document.getElementById("lobby").classList.add("hidden");
+  document.getElementById("game-main").classList.remove("hidden");
+  document.getElementById("leave-room-btn").style.display = "block";
+  document.getElementById("room-info-code").textContent = code;
+  // Listen to room updates and render board, but don't allow actions
+  if (window.unsubscribeSpectate) window.unsubscribeSpectate();
+  window.unsubscribeSpectate = firebase.database().ref("osrs-board/rooms/" + code).on("value", snap => {
+    if (!snap.exists()) {
+      alert("Room closed.");
+      document.getElementById("game-main").classList.add("hidden");
+      document.getElementById("lobby").classList.remove("hidden");
+      return;
+    }
+    roomData = window.roomData = snap.val();
+    renderGameSpectator();
+  });
+};
+
+function renderGameSpectator() {
+  // Update player chips
+  let playerBar = document.getElementById("room-info-players");
+  playerBar.innerHTML = "";
+  let players = window.roomData.players || {};
+  Object.entries(players).forEach(([pid, p]) => {
+    let chip = document.createElement("span");
+    chip.className = "player-chip" + (p.admin ? " admin" : "");
+    chip.innerHTML = `<span class="emoji">${p.emoji}</span> ${escapeHtml(p.name)}`;
+    playerBar.appendChild(chip);
+  });
+
+  // Render the board and player pieces
+  if (window.roomData.board && window.roomData.game && window.roomData.game.positions) {
+    renderBoard(window.roomData.board, window.roomData.game.positions);
+  }
+
+  // Disable all game action buttons for spectators
+  document.getElementById("roll-btn").disabled = true;
+  document.getElementById("undo-btn").disabled = true;
+  ["sword-btn-float", "kick-btn-float", "reset-btn-float", "log-btn-float", "verification-btn-float"].forEach(id => {
+    let btn = document.getElementById(id);
+    if (btn) btn.style.display = "none";
+  });
+
+  // Make sure reset button is hidden!
+  let resetBtn = document.getElementById("reset-btn-float");
+  if (resetBtn) resetBtn.style.display = "none";
+}
+// --- END JS LOGIC ---
+  </script>
+</body>
+</html>
